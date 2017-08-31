@@ -121,8 +121,10 @@ def save_check_point(it, network, config):
     """
     """
     fns = get_check_point_fns(config)
+    config_dict = namedtupled.reduce(config)
+
     np.savez(fns['param'], *lasagne.layers.get_all_param_values(network))
-    joblib.dump({'iter':it,'config':config}, fns['state'])
+    joblib.dump({'iter':it,'config':config_dict}, fns['state'])
 
 
 def get_check_point_fns(config):
