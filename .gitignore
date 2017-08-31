@@ -1,0 +1,16 @@
+# tensorboard logs
+tmp/
+
+# ipython notebook check points
+.ipynb_checkpoints/
+
+# all python binaries
+*.pyc
+
+# all vim swap files
+*.swp
+
+# local config file
+config.json
+
+
