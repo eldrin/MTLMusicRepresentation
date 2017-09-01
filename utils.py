@@ -70,6 +70,7 @@ def open_datastream(config, is_train=True):
 def get_loggers(config):
     """"""
     fn = config.paths.file_name.format(config.target)
+    fn += '.log'
     log_fn = os.path.join(config.paths.log, fn)
 
     # init standard logger
@@ -127,18 +128,22 @@ def save_check_point(it, network, config):
     joblib.dump({'iter':it,'config':config_dict}, fns['state'])
 
 
-def get_check_point_fns(config):
+def get_check_point_fns(it, config):
     """"""
     fns = {}
     fns['param'] = None
     fns['state'] = None
 
-    try:
-        dump_root = config.paths.model
-        fname = config.paths.file_name.format(config.target)
+    dump_root = config.paths.model
+    fname = config.paths.file_name.format(config.target)
 
-        fns['param'] = os.path.join(dump_root, fname + '_param' + '.npz')
-        fns['state'] = os.path.join(dump_root, fname + '_state' + '.dat.gz')
+    try:
+        fns['param'] = os.path.join(
+            dump_root,
+            fname + '_{:d}k_param.npz'.format(it/1000))
+        fns['state'] = os.path.join(
+            dump_root,
+            fname + '_{:d}k_state.dat.gz'.format(it/1000))
     except Exception as e:
         raise e # TODO: elaborate this
 
