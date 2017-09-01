@@ -125,10 +125,10 @@ def save_check_point(it, network, config):
     config_dict = namedtupled.reduce(config)
 
     np.savez(fns['param'], *lasagne.layers.get_all_param_values(network))
-    joblib.dump({'iter':it,'config':config_dict}, fns['state'])
+    joblib.dump({'iter':it, 'config':config_dict}, fns['state'])
 
 
-def get_check_point_fns(it, config):
+def get_check_point_fns(config):
     """"""
     fns = {}
     fns['param'] = None
@@ -136,14 +136,13 @@ def get_check_point_fns(it, config):
 
     dump_root = config.paths.model
     fname = config.paths.file_name.format(config.target)
+    suffix_param = '_param.npz'
+    suffix_state = '_state.dat.gz'
 
     try:
-        fns['param'] = os.path.join(
-            dump_root,
-            fname + '_{:d}k_param.npz'.format(it/1000))
-        fns['state'] = os.path.join(
-            dump_root,
-            fname + '_{:d}k_state.dat.gz'.format(it/1000))
+        fns['param'] = os.path.join(dump_root, fname + suffix_param)
+        fns['state'] = os.path.join(dump_root, fname + suffix_state)
+
     except Exception as e:
         raise e # TODO: elaborate this
 
