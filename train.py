@@ -70,7 +70,13 @@ class Trainer:
                         loss_tr = self.cost(X,Y).item()
 
                         # get valid samples
-                        Xv,Yv,_ = next(valid_data_iterator)
+                        try:
+                            Xv,Yv,_ = next(valid_data_iterator)
+                        except StopIteration as se:
+                            valid_data_iterator = \
+                                self.data_valid.get_epoch_iterator()
+                            Xv,Yv,_ = next(valid_data_iterator)
+
                         loss_vl = self.cost(Xv,Yv).item()
 
                         # print to logger
