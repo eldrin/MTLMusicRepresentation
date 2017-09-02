@@ -1,3 +1,5 @@
+import traceback
+
 from utils import load_check_point, save_check_point
 from utils import open_datastream, get_loggers
 from utils import get_in_shape
@@ -86,7 +88,8 @@ class Trainer:
             self.logger.error(ke)
 
         except Exception as e:
-            self.logger.error(e)
+            # self.logger.error(e)
+            traceback.print_exc()
 
         finally:
             save_check_point(self.k, self.net['out'], self.config)
