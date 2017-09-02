@@ -51,7 +51,7 @@ class Trainer:
         try:
             for n in xrange(n_iters):
                 self.logger.debug('Start {:d}th Iteration'.format(n))
-
+                valid_data_iterator = self.data_valid.get_epoch_iterator()
                 for j,data in enumerate(self.data_train.get_epoch_iterator()):
 
                     # save check point
@@ -70,7 +70,7 @@ class Trainer:
                         loss_tr = self.cost(X,Y).item()
 
                         # get valid samples
-                        Xv,Yv,_ = self.data_valid.get_data()
+                        Xv,Yv,_ = next(valid_data_iterator)
                         loss_vl = self.cost(Xv,Yv).item()
 
                         # print to logger
