@@ -70,8 +70,8 @@ def open_datastream(config, is_train=True):
 def get_loggers(config):
     """"""
     fn = config.paths.file_name.format(config.target)
-    fn += '.log'
-    log_fn = os.path.join(config.paths.log, fn)
+    # fn += '.log'
+    log_fn = os.path.join(config.paths.log, fn + '.log')
 
     # init standard logger
     logFormatter = logging.Formatter(
