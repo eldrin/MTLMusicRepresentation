@@ -23,6 +23,8 @@ import librosa
 from utils import pmap, load_audio
 from utils import config as CONFIG
 
+import fire
+
 
 class MSD(IndexableDataset):
     """Assuming input datastream is a example of
@@ -33,10 +35,11 @@ class MSD(IndexableDataset):
     provides_sources = ('raw')
 
     def __init__(
-        self, source, which_set, config, *args, **kwargs):
+        self, which_set, config, *args, **kwargs):
         """
         """
-        self.source = source
+        # self.source = source
+        self.source = 'raw'
         self.axis_labels = None
 
         self.sr = config.hyper_parameters.sample_rate
@@ -67,9 +70,14 @@ class MSD(IndexableDataset):
                 split_fn = eval(
                     'self.config.paths.meta_data.splits.{}'.format(self.target)
                 )
+                split_fn = os.path.join(
+                    self.config.paths.meta_data.root, split_fn)
+
                 target_fn = eval(
                     'self.config.paths.meta_data.targets.{}'.format(self.target)
                 )
+                target_fn = os.path.join(
+                    self.config.paths.meta_data.root, target_fn)
 
                 self.internal_idx = joblib.load(split_fn)[self.which_set]
                 target = joblib.load(target_fn)
@@ -177,53 +185,46 @@ class MSD(IndexableDataset):
                     self.source)
             )
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-p', '--port', type=int, default=5557,
-        help='set data server port number')
-    parser.add_argument(
-        '-z', '--hwm', type=int, default=10,
-        help='set high-water mark, number of prepared mini batch')
-    parser.add_argument(
-        '-b', '--batchsz', type=int, default=32,
-        help='set batch size')
-    parser.add_argument(
-        '-s', '--source', type=str, default='raw',
-        help='flag for feature type {"raw","stft"}')
-    parser.add_argument(
-        '-t', '--target', type=str, default='self',
-        help='flag for label type {"self","tag","tempo","pref"}'
-    )
-    parser.add_argument(
-        '-w', '--whichset', type=str, default='train',
-        help='flag for setting which set will be feeded'\
-        +'{"train","valid"}')
-
-    args = parser.parse_args()
-
-    # load dataset & preprocessor
-    print('Initialize Data Server...')
-    dataset = MSD(
-        source=args.source,
-        which_set=args.whichset,
-        config=CONFIG,
-        target=args.target
-    )
-
+def launch_data_server(dataset, config):
+    """
+    """
     n_items = dataset.num_examples
-    it_schm = ShuffledScheme(n_items,args.batchsz)
+    batch_sz = config.hyper_parameters.batch_size
+
+    it_schm = ShuffledScheme(n_items, batch_sz)
 
     data_stream = DataStream(
         dataset=dataset,
         iteration_scheme=it_schm
     )
 
+    if dataset.which_set == "train":
+        port = config.data_server.train_port
+    elif dataset.which_set == "valid":
+        port = config.data_server.valid_port
+    else:
+        raise ValueError('[ERROR] {} is not supported dataset type!')
+
     try:
         start_server(
             data_stream,
-            port=args.port,
-            hwm=args.hwm
+            port=port,
+            hwm=config.data_server.hwm
         )
     except KeyboardInterrupt as ke:
         print(ke)
+
+def initiate_data_server(which_set):
+    """
+    """
+    global CONFIG
+
+    print('Initialize Data Server...')
+    dataset = MSD(
+        which_set=which_set,
+        config=CONFIG,
+    )
+    launch_data_server(dataset, CONFIG)
+
+if __name__ == "__main__":
+    fire.Fire(initiate_data_server)
