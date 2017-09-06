@@ -54,11 +54,8 @@ class Trainer:
                 'self.config.paths.meta_data.size.{}.valid'.format(target))
 
         # get n_iteration
-        self.n_iter = sum(
-            list(chain.from_iterable(
-                [d.values() for d in self.dset_size.values()]
-            ))
-        )
+        self.n_iter = sum([d['train'] for d in self.dset_size.values()])
+        self.n_iter = int(self.n_iter / config.hyper_parameters.batch_size)
 
     def fit(self):
         """"""
