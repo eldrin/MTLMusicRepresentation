@@ -16,6 +16,7 @@ import numpy as np
 import scipy
 
 from ops import _get_stft_kernels, _log_amp
+
 from lasagne.layers.conv import conv_output_length
 from lasagne.utils import as_tuple
 

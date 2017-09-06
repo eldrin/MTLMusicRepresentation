@@ -20,11 +20,9 @@ from functools import partial
 import tempfile
 
 import librosa
-from utils import pmap, load_audio
-from utils import config as CONFIG
-
 import fire
 
+from utils.misc import pmap, load_audio, load_config
 
 class MSD(IndexableDataset):
     """Assuming input datastream is a example of
@@ -35,10 +33,9 @@ class MSD(IndexableDataset):
     provides_sources = ('raw')
 
     def __init__(
-        self, which_set, config, *args, **kwargs):
+        self, target, which_set, config, *args, **kwargs):
         """
         """
-        # self.source = source
         self.source = 'raw'
         self.axis_labels = None
 
@@ -50,7 +47,7 @@ class MSD(IndexableDataset):
         self.hop_length = config.hyper_parameters.hop_size
         self.output_norm = config.data_server.output_norm
 
-        self.target = config.target
+        self.target = target
         self.which_set = which_set
 
         self.n_jobs = config.data_server.n_jobs
@@ -185,25 +182,16 @@ class MSD(IndexableDataset):
                     self.source)
             )
 
-def launch_data_server(dataset, config):
+def launch_data_server(dataset, port, config):
     """
     """
     n_items = dataset.num_examples
     batch_sz = config.hyper_parameters.batch_size
-
     it_schm = ShuffledScheme(n_items, batch_sz)
-
     data_stream = DataStream(
         dataset=dataset,
         iteration_scheme=it_schm
     )
-
-    if dataset.which_set == "train":
-        port = config.data_server.train_port
-    elif dataset.which_set == "valid":
-        port = config.data_server.valid_port
-    else:
-        raise ValueError('[ERROR] {} is not supported dataset type!')
 
     try:
         start_server(
@@ -214,17 +202,19 @@ def launch_data_server(dataset, config):
     except KeyboardInterrupt as ke:
         print(ke)
 
-def initiate_data_server(which_set):
+
+def initiate_data_server(target, which_set, port, config_fn):
     """
     """
-    global CONFIG
+    config = load_config(config_fn)
 
     print('Initialize Data Server...')
     dataset = MSD(
+        target=target,
         which_set=which_set,
-        config=CONFIG,
+        config=config,
     )
-    launch_data_server(dataset, CONFIG)
+    launch_data_server(dataset, port, config)
 
 if __name__ == "__main__":
     fire.Fire(initiate_data_server)

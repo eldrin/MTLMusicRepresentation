@@ -1,0 +1,75 @@
+{
+    "target":"tempo_gmm",
+
+    "hyper_parameters":{
+        "batch_size":48,
+	
+        "patch_length":2.5,
+        "n_fft":1024,
+        "hop_size":256,
+        "sample_rate":22050,
+
+        "architecture":"2dconv_clf_deep",
+        "n_out":20,
+        "out_act":"softmax",
+
+        "optimizer":"adam",
+        "learning_rate":0.001,
+
+        "l2":0.000001,
+
+        "activation":"rectify"
+    },
+
+    "train":{
+        "n_epoch":10,
+        "verbose_frq":100,
+        "check_point_intv":5000
+    },
+
+    "paths":{
+        "file_name":"conv_2d_{}_test",
+
+        "model":"/mnt/bulk2/models/",
+        "log":"/mnt/bulk2/models/",
+
+        "tblog":"./tmp/",
+
+        "meta_data":{
+            "root":"/mnt/msd/meta_data/",
+            "targets":{
+                "tag":"lastfm_tags200_plsa.dat.gz",
+                "tempo":"msd_tempo.dat.gz",
+                "tempo_gmm":"msd_tempo_gmm.dat.gz",
+                "pref":"user_taste20_wrmf.dat.gz"
+            },
+            "splits":{
+                "tag":"lastfm_tags_split.dat.gz",
+                "tempo":"msd_tempo_split.dat.gz",
+                "tempo_gmm":"msd_tempo_split.dat.gz",
+                "pref":"user_taste_split.dat.gz"
+            }
+        },
+
+        "audio":{
+            "root":"/mnt/msd/songs/"
+        },
+
+        "preproc":{
+            "scaler":"/mnt/msd/meta_data/sclr_dbscale_stft.dat.gz"
+        },
+
+        "path_map":"/mnt/msd/MSD_to_path.pkl"
+    },
+
+    "data_server":{
+        "host":"localhost",
+        "output_norm":false,
+        "hwm":10,
+        "n_jobs":8
+    },
+
+    "etc":{
+        "eps":5.960464477539063e-08
+    }
+}

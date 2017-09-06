@@ -25,8 +25,6 @@ from theano import tensor as T
 import lasagne
 from lasagne import layers as L
 
-from fuel.streams import ServerDataStream
-
 import librosa
 import soundfile as sf
 import sox
@@ -34,7 +32,53 @@ import sox
 from tqdm import tqdm
 
 import namedtupled
-config = namedtupled.json(path=open('config.json','r'), name='config')
+
+import json
+
+def load_config(fn):
+    """"""
+    config = json.load(open(fn, 'r'))
+
+    if not isinstance(config['target'], list):
+        config['target'] = [config['target']]
+
+    if not isinstance(config['hyper_parameters']['n_out'], list):
+        config['hyper_parameters']['n_out'] = \
+                [config['hyper_parameters']['n_out']]
+
+    if not isinstance(config['hyper_parameters']['out_act'], list):
+        config['hyper_parameters']['out_act'] = \
+                [config['hyper_parameters']['out_act']]
+
+    # check if targets, outs, acts have same length
+    if any([(len(config['target']) != len(config['hyper_parameters']['n_out'])),
+            (len(config['target']) != len(config['hyper_parameters']['out_act'])),
+            (len(config['hyper_parameters']['n_out']) != \
+             len(config['hyper_parameters']['out_act']))]):
+        raise ValueError(
+            '[ERROR] target, n_out, act_out must have same length!')
+
+    # get dataset sizes
+    meta_data_root = config['paths']['meta_data']['root']
+    split_fns = config['paths']['meta_data']['splits']
+    config['paths']['meta_data']['size'] = {}
+    for target in config['target']:
+        split_fn = os.path.join(meta_data_root, split_fns[target])
+        config['paths']['meta_data']['size'][target] = {}
+        if not os.path.exists(split_fn):
+            raise ValueError('[ERROR] target is not existing')
+        else:
+            split = joblib.load(split_fn)
+            config['paths']['meta_data']['size'][target]['train'] = len(split['train'])
+            config['paths']['meta_data']['size'][target]['valid'] = len(split['valid'])
+
+    return namedtupled.map(config)
+
+
+def get_layer(net, layer_name):
+    """"""
+    layers = L.get_all_layers(net)
+    return filter(lambda x:x.name == layer_name, layers)[0]
 
 
 def get_in_shape(config):
@@ -50,27 +94,13 @@ def get_in_shape(config):
     return (None, 2, sig_len)
 
 
-def open_datastream(config, is_train=True):
-    """
-    """
-    if is_train:
-        port = config.data_server.train_port
-    else:
-        port = config.data_server.valid_port
-
-    host = config.data_server.host
-    hwm = config.data_server.hwm
-
-    return ServerDataStream(
-        sources=('raw'), produces_examples=True,
-        port=port, host=host, hwm=hwm
-    )
-
-
 def get_loggers(config):
     """"""
-    fn = config.paths.file_name.format(config.target)
-    # fn += '.log'
+    # make name string here
+    # make target string
+    target_string = '_'.join(config.target)
+    fn = config.paths.file_name.format(target_string)
+
     log_fn = os.path.join(config.paths.log, fn + '.log')
 
     # init standard logger
@@ -93,94 +123,12 @@ def get_loggers(config):
 
     return rootLogger, tblog
 
-
-def load_check_point(network, config):
-    """
-    """
-    fns = get_check_point_fns(config)
-    it = 0
-
-    if fns['param'] is not None and os.path.exists(fns['param']):
-        try:
-            print('Loadong pre-trained weight...')
-
-            with np.load(fns['param']) as f:
-                param_values = [f['arr_%d' % i] for i in range(len(f.files))]
-
-            lasagne.layers.set_all_param_values(network, param_values)
-            it = joblib.load(fns['state'])['iter']
-        except Exception as e:
-            print(e)
-            print('Cannot load parameters!')
-    else:
-        print('Cannot find parameters!')
-
-    return it, network
-
-
-def save_check_point(it, network, config):
-    """
-    """
-    fns = get_check_point_fns(config)
-    config_dict = namedtupled.reduce(config)
-
-    np.savez(fns['param'], *lasagne.layers.get_all_param_values(network))
-    joblib.dump({'iter':it, 'config':config_dict}, fns['state'])
-
-
-def get_check_point_fns(config):
-    """"""
-    fns = {}
-    fns['param'] = None
-    fns['state'] = None
-
-    dump_root = config.paths.model
-    fname = config.paths.file_name.format(config.target)
-    suffix_param = '_param.npz'
-    suffix_state = '_state.dat.gz'
-
-    try:
-        fns['param'] = os.path.join(dump_root, fname + suffix_param)
-        fns['state'] = os.path.join(dump_root, fname + suffix_state)
-
-    except Exception as e:
-        raise e # TODO: elaborate this
-
-    return fns
-
-
 def preemphasis(signal):
     return lfilter([1, -0.70], 1, signal)
 
 
 def deemphasis(signal):
     return lfilter([1, 0.70], 1, signal)
-
-
-def prepare_X(x,preproc,n_fft=1024,hop_sz=256):
-    """ Prepare input for 2D CNN """
-
-    # shape of x should be
-    # (n_ch, n_sample-(5s))
-    X = map(
-        lambda x:preproc.transform(x.T).T,
-        map(
-            lambda ch:
-            np.log10(
-                np.abs(
-                    librosa.stft(
-                        ch,n_fft=n_fft,
-                        hop_length=hop_sz
-                    )
-                ) + EPS
-            ),
-            x
-        )
-    )
-    X = np.array(X)[None,:,:]
-
-    return X
-
 
 def load_audio(fn,sr,mono=False,dur=5.):
     """

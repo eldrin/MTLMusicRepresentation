@@ -13,4 +13,7 @@ tmp/
 # local config file
 config.json
 
+# all feature files
+*.h5
+
 

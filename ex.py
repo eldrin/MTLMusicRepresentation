@@ -1,18 +1,26 @@
+import os
+
 from train import Trainer
-from utils import config as CONFIG
 
-def train():
+from data_server.context_manager import data_context
+
+import fire
+
+# TODO: automate tensorboard launching / closing process
+#       currently, tensor board is needed to be launched manually
+
+def train(config_fn):
     """"""
-    # initialize trainer
-    trainer = Trainer(CONFIG)
+    config_fn = os.path.abspath(config_fn)
 
-    # currently, data servers need to be launched manually
-    # also, tensor board is needed to be launched manually
-    # TODO: automate data servers / tensorboard launching / closing process
-    trainer.fit()
+    # launch data servers
+    with data_context(config_fn) as (config, data_streams):
+
+        # initialize trainer
+        trainer = Trainer(config, data_streams)
+
+        # train
+        trainer.fit()
 
 if __name__ == "__main__":
-    train()
-
-
-
+    fire.Fire(train)

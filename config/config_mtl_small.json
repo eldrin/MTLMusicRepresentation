@@ -1,18 +1,20 @@
 {
-    "target":"tempo_gmm",
+    "target":["pref","tempo_gmm"],
 
     "hyper_parameters":{
+        "batch_size":48,
+	
         "patch_length":2.5,
         "n_fft":1024,
         "hop_size":256,
         "sample_rate":22050,
 
-        "architecture":"2dconv_clf_deep",
-        "n_out":20,
-        "out_act":"softmax",
+        "architecture":"2dconv_clf_small",
+        "n_out":[20,20],
+        "out_act":["softmax","softmax"],
 
         "optimizer":"adam",
-        "learning_rate":0.001,
+        "learning_rate":0.0001,
 
         "l2":0.000001,
 
@@ -21,12 +23,12 @@
 
     "train":{
         "n_epoch":10,
-        "verbose_frq":100,
+        "verbose_frq":20,
         "check_point_intv":5000
     },
 
     "paths":{
-        "file_name":"conv_2d_{}_test",
+        "file_name":"conv_2d_{}_small",
 
         "model":"/mnt/bulk2/models/",
         "log":"/mnt/bulk2/models/",
@@ -39,13 +41,13 @@
                 "tag":"lastfm_tags200_plsa.dat.gz",
                 "tempo":"msd_tempo.dat.gz",
                 "tempo_gmm":"msd_tempo_gmm.dat.gz",
-                "pref":"user_taste20_wrmf.dat.gz"
+                "pref":"user_taste20_plsa.dat.gz"
             },
             "splits":{
-                "tag":"lastfm_tags_split.dat.gz",
-                "tempo":"msd_tempo_split.dat.gz",
-                "tempo_gmm":"msd_tempo_split.dat.gz",
-                "pref":"user_taste_split.dat.gz"
+                "tag":"lastfm_tags_split_small.dat.gz",
+                "tempo":"msd_tempo_split_small.dat.gz",
+                "tempo_gmm":"msd_tempo_split_small.dat.gz",
+                "pref":"user_taste_split_small.dat.gz"
             }
         },
 
@@ -62,11 +64,9 @@
 
     "data_server":{
         "host":"localhost",
-        "train_port":5557,
-        "valid_port":5558,
-        "output_norm":true,
+        "output_norm":false,
         "hwm":10,
-        "n_jobs":16
+        "n_jobs":8
     },
 
     "etc":{
