@@ -23,7 +23,7 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
     beta = config.hyper_parameters.l2
 
     if feature_layer is None:
-        feature_layer = 'fc.bn.do'
+        feature_layer = 'fc'
 
     # function containor
     functions = {}
