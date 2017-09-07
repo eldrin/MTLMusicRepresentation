@@ -23,7 +23,7 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
     beta = config.hyper_parameters.l2
 
     if feature_layer is None:
-        feature_layer = 'fc'
+        feature_layer = 'fc.bn.do'
 
     # function containor
     functions = {}
@@ -80,13 +80,13 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         )
 
     # feature is class independent
-    feature = L.get_output(net[feature_layer], deterministic=True)
+    feature = L.get_output(get_layer(net, feature_layer),
+                           deterministic=True)
     functions['feature'] = theano.function(
         inputs = [layers[0].input_var],
         outputs = feature,
         allow_input_downcast = True
     )
-
     return functions
 
 
@@ -235,7 +235,8 @@ def get_check_point_fns(config):
     fns['state'] = None
 
     dump_root = config.paths.model
-    fname = config.paths.file_name.format(config.target)
+    target_string = '_'.join(config.target)
+    fname = config.paths.file_name.format(target_string)
     suffix_param = '_param.npz'
     suffix_state = '_state.dat.gz'
 

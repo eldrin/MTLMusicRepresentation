@@ -12,14 +12,17 @@ DEFAULT_PORT = 5557
 # TODO: Deal with the case of launching remote data server
 
 @contextmanager
-def data_context(config, verbose=False):
+def data_context(
+    config_fn, which_set, verbose=False):
     """"""
+    config = load_config(config_fn)
+
     # check remote
     if hasattr(config.data_server, 'ports'):
         ports = namedtupled.reduce(config.data_server.ports)
         remote_server = True
     else:
-        servers, ports = launch_servers(config, verbose)
+        servers, ports = launch_servers(config_fn, which_set, verbose)
         remote_server = False
     streams = StreamManager(ports, config)
 
@@ -30,10 +33,12 @@ def data_context(config, verbose=False):
         kill_servers(servers)
 
 
-def launch_servers(config, verbose=False):
+def launch_servers(
+    config_fn, which_set=['train','valid'], verbose=False):
     """"""
     global DEFAULT_PORT
 
+    config = load_config(config_fn)
     data_servers = {}
     ports = {}
     port = DEFAULT_PORT
@@ -42,7 +47,7 @@ def launch_servers(config, verbose=False):
         data_servers[target] = {}
         ports[target] = {}
 
-        for dset in ['train', 'valid']:
+        for dset in which_set:
             if dset=='valid':
                 ports[target][dset] = port + 1
             else:
@@ -63,7 +68,7 @@ def launch_servers(config, verbose=False):
                         args, stdout=devnull, stderr=devnull)
         port += 10
 
-    return data_servers, ports, config
+    return data_servers, ports
 
 
 def kill_servers(servers):

@@ -77,7 +77,7 @@ def load_config(fn):
 
 def get_layer(net, layer_name):
     """"""
-    layers = L.get_all_layers(net)
+    layers = L.get_all_layers(net['IO'])
     return filter(lambda x:x.name == layer_name, layers)[0]
 
 

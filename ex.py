@@ -16,7 +16,9 @@ def main(config_fn, data_verbose=False):
     config = load_config(config_fn)
 
     # launch data servers
-    with data_context(config, data_verbose) as data_streams:
+    with data_context(
+        config_fn, which_set=['train','valid'],
+        verbose=data_verbose) as data_streams:
 
         # initialize trainer
         trainer = Trainer(config, data_streams)
