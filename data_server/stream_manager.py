@@ -9,11 +9,6 @@ class StreamManager:
         self.host = config.data_server.host
         self.hwm = config.data_server.hwm
 
-        if self.host != 'localhost':
-            raise ValueError(
-                '[ERROR] remote server is not supported yet!'
-            )
-
         # open streams
         self.data_streams = {}
         for target, dset_ports in ports.iteritems():
