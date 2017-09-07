@@ -17,8 +17,10 @@ def data_context(config, verbose=False):
     # check remote
     if hasattr(config.data_server, 'ports'):
         ports = namedtupled.reduce(config.data_server.ports)
+        remote_server = True
     else:
         servers, ports = launch_servers(config, verbose)
+        remote_server = False
     streams = StreamManager(ports, config)
 
     yield  streams
