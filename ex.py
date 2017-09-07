@@ -2,6 +2,7 @@ import os
 
 from train import Trainer
 from data_server.context_manager import data_context
+from utils.misc import load_config
 
 import fire
 
