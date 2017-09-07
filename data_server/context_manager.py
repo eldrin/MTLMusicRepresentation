@@ -2,6 +2,8 @@ import os
 from contextlib import contextmanager
 import subprocess
 
+import namedtupled
+
 from utils.misc import load_config
 from data_server.stream_manager import StreamManager
 
@@ -14,7 +16,7 @@ def data_context(config, verbose=False):
     """"""
     # check remote
     if hasattr(config.data_server, 'ports'):
-        ports = config.data_server.ports
+        ports = namedtupled.reduce(config.data_server.ports)
     else:
         servers, ports = launch_servers(config, verbose)
     streams = StreamManager(ports, config)
