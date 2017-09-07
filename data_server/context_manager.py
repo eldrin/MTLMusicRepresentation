@@ -10,34 +10,29 @@ DEFAULT_PORT = 5557
 # TODO: Deal with the case of launching remote data server
 
 @contextmanager
-def data_context(config_fn, ports=None, verbose=False):
+def data_context(config, verbose=False):
     """"""
-
-    # setup data servers and open pipeline to them
-    if ports is None:
-        remote_server = False
-        servers, ports, config = launch_servers(config_fn, verbose)
+    # check remote
+    if hasattr(config.data_server, 'ports'):
+        ports = config.data_server.ports
     else:
-        remote_server = True
-        config = load_config(config_fn)
-
+        servers, ports = launch_servers(config, verbose)
     streams = StreamManager(ports, config)
 
-    yield  (config, streams)
+    yield  streams
 
     # tear down data servers only when it's local
     if not remote_server:
         kill_servers(servers)
 
 
-def launch_servers(config_fn, verbose=False):
+def launch_servers(config, verbose=False):
     """"""
     global DEFAULT_PORT
 
     data_servers = {}
     ports = {}
     port = DEFAULT_PORT
-    config = load_config(config_fn)
 
     for target in config.target:
         data_servers[target] = {}

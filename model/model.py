@@ -35,7 +35,7 @@ class Model:
             self.net, config
         )
         # load trained model
-        funcs = get_train_funcs(self.net, config)
+        funcs = get_train_funcs(self.net, config, feature_layer=feature_layer)
 
         if debug:
             debug_funcs = get_debug_funcs(
