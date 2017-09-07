@@ -37,12 +37,6 @@ class Model:
         # load trained model
         funcs = get_train_funcs(self.net, config, feature_layer=feature_layer)
 
-        if debug:
-            debug_funcs = get_debug_funcs(
-                self.net, feature_layer, cam_layer, self.config)
-        else:
-            debug_funcs = None
-
         # assign instance method
         self._feature = funcs['feature']
         self._partial_fit = {}
