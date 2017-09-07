@@ -14,13 +14,16 @@ from lasagne.updates import sgd,nesterov_momentum,adagrad,adam,rmsprop,adamax
 
 from utils.misc import *
 
-def get_train_funcs(net, config, **kwargs):
+def get_train_funcs(net, config, feature_layer=None, **kwargs):
     """
     """
     # optimizer setting
     optimizer = eval(config.hyper_parameters.optimizer)
     lr = config.hyper_parameters.learning_rate
     beta = config.hyper_parameters.l2
+
+    if feature_layer is None:
+        feature_layer = 'fc.bn.do'
 
     # function containor
     functions = {}
@@ -76,6 +79,14 @@ def get_train_funcs(net, config, **kwargs):
             allow_input_downcast = True
         )
 
+    # feature is class independent
+    feature = L.get_output(net[feature_layer], deterministic=True)
+    functions['feature'] = theano.function(
+        inputs = [layers[0].input_var],
+        outputs = feature,
+        allow_input_downcast = True
+    )
+
     return functions
 
 
@@ -87,6 +98,7 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
     cam_layer = get_layer(net, cam_layer)
     feature_layer = get_layer(net, feature_layer)
 
+    # function containor
     functions = {}
 
     # feature is not output dependant
@@ -111,7 +123,6 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
         outputs = features,
         allow_input_downcast = True
     )
-
 
     # prediction / CAM are output dependant
     for target in config.target:

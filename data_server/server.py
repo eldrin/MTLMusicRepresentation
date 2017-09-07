@@ -1,23 +1,17 @@
 import os
-import argparse
-from collections import OrderedDict
 import cPickle as pkl
-import sqlite3
 
 import numpy as np
-import pandas as pd
 
-from fuel.schemes import ShuffledScheme,SequentialScheme
+from fuel.schemes import ShuffledScheme
 from fuel.datasets import IndexableDataset
 from fuel.streams import DataStream
 from fuel.server import start_server
-from fuel.transformers import Transformer
+
 from sklearn.externals import joblib
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 
-import h5py
 from functools import partial
-import tempfile
 
 import librosa
 import fire
@@ -201,7 +195,8 @@ def launch_data_server(dataset, port, config):
         )
     except KeyboardInterrupt as ke:
         print(ke)
-
+    finally:
+        data_stream.close()
 
 def initiate_data_server(target, which_set, port, config_fn):
     """
