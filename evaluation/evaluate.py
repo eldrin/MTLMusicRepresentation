@@ -3,7 +3,7 @@ import cPickle as pkl
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_predict
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
 from sklearn.externals import joblib
 
 import namedtupled
@@ -29,13 +29,28 @@ class ExternalTaskEvaluator:
         labels = self.data['labels'][:]
 
         y_pred = cross_val_predict(self.model, X, y_true, cv=10).astype(int)
-        print(classification_report(y_true, y_pred, target_names=labels))
+        cr = classification_report(y_true, y_pred, target_names=labels)
+        ac = accuracy_score(y_true, y_pred)
 
+        return {'classification_report':cr, 'accuracy':ac}
 
-def external_eval(fn):
-    evaluator = ExternalTaskEvaluator(fn)
-    evaluator.evaluate()
+def external_eval(in_fn, out_fn):
+    evaluator = ExternalTaskEvaluator(in_fn)
+    res = evaluator.evaluate()
 
+    lines = '=================  Classification Report =================='
+    lines += '\n'
+    lines += res['classification_report']
+    lines += '\n'
+    lines += 'Overall Accuracy: {:.2%}'.format(res['accuracy'])
+
+    print
+    print(lines)
+
+    # save lines
+    if out_fn is not None:
+        with open(out_fn, 'w') as f:
+            f.write(lines)
 
 # Evaluator for all internal tasks
 class InternalTaskEvaluator:

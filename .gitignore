@@ -1,6 +1,9 @@
 # tensorboard logs
 tmp/
 
+# misc data
+data/
+
 # ipython notebook check points
 .ipynb_checkpoints/
 

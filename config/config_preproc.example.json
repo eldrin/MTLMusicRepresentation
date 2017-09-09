@@ -1,0 +1,25 @@
+{
+    "paths":{
+        "db":{
+            "root":"/mnt/msd/",
+            "pref":"user_song_preference.db",
+            "tag":"lastfm_tags.db",
+            "bpm":"meta_data/msd_tempo.dat.gz"
+        },
+        "model":{
+            "root":"/mnt/msd/meta_data/"
+        }
+    },
+    "k":{
+        "tag":200,
+        "pref":20,
+        "bpm":20
+    },
+    "algorithm":{
+        "tag":"plsa",
+        "pref":"plsa",
+        "bpm":"gmm"
+    },
+    "subsample":0.05,
+    "train_ratio":0.9
+}
