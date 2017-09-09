@@ -62,7 +62,7 @@ class PLSA:
         transformed, self.components_ = plsa(
             X, self.k, self.n_iter, self.min_count, self.method)
 
-        return trasnformed
+        return transformed
 
 class WRMF:
     """ Simple wrapper object for sklearn-style interface for wmf (benanne) """
