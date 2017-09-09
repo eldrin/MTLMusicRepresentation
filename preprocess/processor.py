@@ -1,12 +1,14 @@
 import os
 import sys
+DIR_PATH = os.path.dirname(os.path.realpath(__file__))
+
 # TODO: currently installation of numba-plsa must be done manually
 #       can automate?
-sys.path.append(os.path.abspath('../../numba-plsa/'))
+sys.path.append(os.path.join(DIR_PATH,'../../numba-plsa/'))
 
 # TODO: currently installation of wrmf must be done manually
 #       can automate?
-sys.path.append(os.path.abspath('../../wmf/'))
+sys.path.append(os.path.join(DIR_PATH,'../../wmf/'))
 
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 from numba_plsa.plsa import plsa
