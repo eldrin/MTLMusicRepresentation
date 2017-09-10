@@ -39,7 +39,7 @@ def check_all_info(audio_root, path_map):
         return tids, get_file_info(fn)
 
     audio_info = pmap(
-        _checker, path_map.iteritems(),
+        _checker, path_map.items(),
         n_jobs=8, verbose=True
     )
     return audio_info
