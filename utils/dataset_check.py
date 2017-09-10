@@ -39,6 +39,6 @@ def check_all_info(audio_root, path_map):
     audio_info = pmap(
         partial(_checker, audio_root=audio_root),
         path_map.items(),
-        n_jobs=8, verbose=True
+        n_jobs=4, verbose=True
     )
     return audio_info
