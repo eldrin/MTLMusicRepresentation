@@ -1,4 +1,5 @@
 import os
+from functools import partial
 
 import sox
 from tqdm import tqdm
@@ -28,7 +29,7 @@ def get_file_info(fn):
             'sr':sr, 'dur':dur, 'mono':mono, 'error':err
         }
 
-def _checker(inputs):
+def _checker(inputs, audio_root):
     tid, f = inputs
     fn = os.path.join(audio_root, f)
     return tid, get_file_info(fn)
@@ -36,7 +37,8 @@ def _checker(inputs):
 def check_all_info(audio_root, path_map):
     """"""
     audio_info = pmap(
-        _checker, path_map.items(),
+        partial(_checker, audio_root=audio_root),
+        path_map.items(),
         n_jobs=8, verbose=True
     )
     return audio_info
