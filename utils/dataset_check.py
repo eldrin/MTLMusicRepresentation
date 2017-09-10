@@ -28,17 +28,13 @@ def get_file_info(fn):
             'sr':sr, 'dur':dur, 'mono':mono, 'error':err
         }
 
+def _checker(inputs):
+    tid, f = inputs
+    fn = os.path.join(audio_root, f)
+    return tid, get_file_info(fn)
+
 def check_all_info(audio_root, path_map):
     """"""
-    # audio_info = {}
-    # for tid, f in tqdm(path_map.iteritems()):
-    #     fn = os.path.join(audio_root, f)
-    #     audio_info[tid] = get_file_info(fn)
-    def _checker(inputs):
-        tid, f = inputs
-        fn = os.path.join(audio_root, f)
-        return tid, get_file_info(fn)
-
     audio_info = pmap(
         _checker, path_map.items(),
         n_jobs=8, verbose=True
