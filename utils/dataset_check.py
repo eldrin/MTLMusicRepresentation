@@ -8,6 +8,7 @@ from misc import load_audio
 def get_file_info(fn):
     """"""
     err = None
+    sr, dur, mono = None, None, None
     try:
         sr = sox.file_info.sample_rate(fn)
         dur = sox.file_info.duration(fn)
