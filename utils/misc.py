@@ -130,7 +130,39 @@ def preemphasis(signal):
 def deemphasis(signal):
     return lfilter([1, 0.70], 1, signal)
 
-def load_audio(fn,sr,mono=False,dur=5.):
+def load_audio(fn, sr=None):
+    """
+    """
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.wav') as tmpf:
+            subprocess.call(
+                ['mpg123','-w',tmpf.name,'-q',fn]
+            )
+
+            y, sr_file = sf.read(
+                tmpf.name, always_2d=True, dtype='float32')
+
+            # transpose & crop
+            y = y.T
+
+            # resampling for outliers
+            if (sr is not None) and (sr_file != sr):
+                y = librosa.resample(
+                    y, sr_file, sr,
+                    res_type='kaiser_fast'
+                )
+
+            # process mono
+            if mono:
+                y = np.repeat(y[None,:],2,axis=0)
+
+    except Exception as e:
+        print(e)
+        return None, None
+    else:
+        return y, sr
+
+def load_audio_batch(fn,sr,mono=False,dur=5.):
     """
     """
     if not os.path.exists(fn):

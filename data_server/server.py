@@ -16,7 +16,7 @@ from functools import partial
 import librosa
 import fire
 
-from utils.misc import pmap, load_audio, load_config
+from utils.misc import pmap, load_audio_batch, load_config
 
 class MSD(IndexableDataset):
     """Assuming input datastream is a example of
@@ -130,7 +130,7 @@ class MSD(IndexableDataset):
             # fetch signal
             signal = pmap(
                 partial(
-                    load_audio,
+                    load_audio_batch,
                     sr=self.sr,
                     dur=self.length
                 ),
