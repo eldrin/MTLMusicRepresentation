@@ -263,11 +263,11 @@ def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3,
             'leave': True
         }
         #Print out the progress as tasks complete
-        if verbose: futures = tqdm(futures)
         for f in as_completed(futures):
             pass
     out = []
     #Get the results from the futures. 
+    if verbose: futures = tqdm(futures)
     for i, future in enumerate(futures):
         try:
             out.append(future.result())
