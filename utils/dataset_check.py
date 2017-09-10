@@ -37,9 +37,8 @@ def check_all_info(audio_root, path_map):
     def _checker(tid, f):
         fn = os.path.join(audio_root, f)
         return tids, get_file_info(fn)
-
     audio_info = pmap(
         _checker, path_map.items(),
-        n_jobs=8, verbose=True
+        n_jobs=8, use_kwargs=True, verbose=True
     )
     return audio_info
