@@ -236,7 +236,8 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         return y
 
 
-def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3):
+def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3,
+         verbose=False):
     """
     """
     #We run the first few iterations serially to catch bugs
@@ -244,7 +245,10 @@ def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3):
         front = [function(**a) if use_kwargs else function(a) for a in array[:front_num]]
     #If we set n_jobs to 1, just run a list comprehension. This is useful for benchmarking and debugging.
     if n_jobs==1:
-        return front + [function(**a) if use_kwargs else function(a) for a in tqdm(array[front_num:])]
+        if verbose: array_remain = tqdm(array[front_num:])
+        else: array_remain = array[front_num:]
+        return front + [function(**a) if use_kwargs else function(a) for a in
+                        array_remain]
     #Assemble the workers
     with ProcessPoolExecutor(max_workers=n_jobs) as pool:
         #Pass the elements of array into function
@@ -259,6 +263,7 @@ def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3):
             'leave': True
         }
         #Print out the progress as tasks complete
+        if verbose: futures = tqdm(futures)
         for f in as_completed(futures):
             pass
     out = []
