@@ -3,7 +3,7 @@ import os
 import sox
 from tqdm import tqdm
 
-from misc import load_audio
+from misc import load_audio, pmap
 
 def get_file_info(fn):
     """"""
@@ -18,6 +18,9 @@ def get_file_info(fn):
         err = sie
     except sox.SoxError as se:
         err = se
+    except KeyboardInterrupt as kbe:
+        print('[ERROR] User interrupted process')
+        raise kbe
     except Exception as e:
         err = e
     finally:
@@ -27,8 +30,16 @@ def get_file_info(fn):
 
 def check_all_info(audio_root, path_map):
     """"""
-    audio_info = {}
-    for tid, f in tqdm(path_map.iteritems()):
+    # audio_info = {}
+    # for tid, f in tqdm(path_map.iteritems()):
+    #     fn = os.path.join(audio_root, f)
+    #     audio_info[tid] = get_file_info(fn)
+    def _checker(tid, f):
         fn = os.path.join(audio_root, f)
-        audio_info[tid] = get_file_info(fn)
+        return tids, get_file_info(fn)
+
+    audio_info = pmap(
+        _checker, path_map.iteritems(),
+        n_jobs=8
+    )
     return audio_info
