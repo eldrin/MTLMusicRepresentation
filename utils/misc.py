@@ -154,8 +154,8 @@ def load_audio(fn, sr=None):
                 )
 
             # process mono
-            if y.ndim < 2:
-                y = np.repeat(y[None,:],2,axis=0)
+            if y.shape[0] < 2:
+                y = np.repeat(y,2,axis=0)
 
     except Exception as e:
         print(e)
