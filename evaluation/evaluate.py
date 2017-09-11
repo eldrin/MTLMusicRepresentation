@@ -1,6 +1,8 @@
 import os
 import cPickle as pkl
 
+import numpy as np
+
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import classification_report, accuracy_score
@@ -28,11 +30,28 @@ class ExternalTaskEvaluator:
         y_true = self.data['y'][:]
         labels = self.data['labels'][:]
 
+        X, y_true = self._check_n_fix_data(X, y_true, True)
+
         y_pred = cross_val_predict(self.model, X, y_true, cv=10).astype(int)
         cr = classification_report(y_true, y_pred, target_names=labels)
         ac = accuracy_score(y_true, y_pred)
 
         return {'classification_report':cr, 'accuracy':ac}
+
+    @staticmethod
+    def _check_n_fix_data(X, y, report=False):
+        """"""
+        # check nan
+        nan_samples = np.where(np.isnan(X).sum(axis=1)>0)[0]
+        normal_samples = np.where(np.isnan(X).sum(axis=1)==0)[0]
+
+        if report:
+            print(
+                'Total {:d} NaN samples found'.format(len(nan_samples))
+            )
+
+        return X[normal_samples], y[normal_samples]
+
 
 def external_eval(in_fn, out_fn):
     evaluator = ExternalTaskEvaluator(in_fn)
