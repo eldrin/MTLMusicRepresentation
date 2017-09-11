@@ -46,26 +46,28 @@ class Trainer:
                     task =  np.random.choice(self.config.target)
                     X, Y, _ = self.dstream.get_data(task, 'train')
 
-                    # update
-                    self.model.partial_fit(task, X, Y)
+                    print(X, Y)
 
-                    if self.model.iter % verbose_frq == 0:
-                        loss_tr = self.model.cost(task, X, Y)
+                    # # update
+                    # self.model.partial_fit(task, X, Y)
 
-                        # get valid samples
-                        Xv, Yv, _ = self.dstream.get_data(task, 'valid')
-                        loss_vl = self.model.cost(task, Xv, Yv)
+                    # if self.model.iter % verbose_frq == 0:
+                    #     loss_tr = self.model.cost(task, X, Y)
 
-                        # print to logger
-                        self.logger.debug(
-                            '{:d}th - {} - loss_tr:{:.5f} loss_vl:{:.5f}'.format(
-                                self.model.iter, task, loss_tr, loss_vl
-                            )
-                        )
-                        self.tblogger.log_value(
-                            'loss_{}_tr'.format(task),loss_tr,self.model.iter)
-                        self.tblogger.log_value(
-                            'loss_{}_vl'.format(task),loss_vl,self.model.iter)
+                    #     # get valid samples
+                    #     Xv, Yv, _ = self.dstream.get_data(task, 'valid')
+                    #     loss_vl = self.model.cost(task, Xv, Yv)
+
+                    #     # print to logger
+                    #     self.logger.debug(
+                    #         '{:d}th - {} - loss_tr:{:.5f} loss_vl:{:.5f}'.format(
+                    #             self.model.iter, task, loss_tr, loss_vl
+                    #         )
+                    #     )
+                    #     self.tblogger.log_value(
+                    #         'loss_{}_tr'.format(task),loss_tr,self.model.iter)
+                    #     self.tblogger.log_value(
+                    #         'loss_{}_vl'.format(task),loss_vl,self.model.iter)
 
         except KeyboardInterrupt as ke:
             self.logger.error(ke)

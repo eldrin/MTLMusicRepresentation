@@ -17,6 +17,7 @@ import librosa
 import fire
 
 from utils.misc import pmap, load_audio_batch, load_config
+from utils.misc import zero_pad_signals, load_audio
 
 class MSD(IndexableDataset):
     """Assuming input datastream is a example of
@@ -128,32 +129,45 @@ class MSD(IndexableDataset):
             )
 
             # fetch signal
+            # signal = pmap(
+            #     partial(
+            #         load_audio_batch,
+            #         sr=self.sr,
+            #         dur=self.length
+            #     ),
+            #     request_fn,
+            #     n_jobs=self.n_jobs
+            # )
             signal = pmap(
                 partial(
-                    load_audio_batch,
-                    sr=self.sr,
-                    dur=self.length
+                    load_audio,
+                    sr=self.sr
                 ),
                 request_fn,
                 n_jobs=self.n_jobs
             )
+            signal = [s[0] for s in signal]
+            signal = zero_pad_signals(signal)
 
             if self.target!='self':
                 # fetch target
                 target = map(lambda ix:self.Y[ix],request)
                 data = filter(
-                    lambda y:y[0] is not None,
-                    zip(signal,target)
+                    lambda y:y[0].sum() > 0,
+                    zip(signal, target)
                 )
-                X = np.array(map(lambda x:x[0],data)).astype(np.float32)
-                X = self._get_feature(X)
-                Y = np.array(map(lambda x:x[1],data)).astype(np.float32)
+                # X = np.array(map(lambda x:x[0],data)).astype(np.float32)
+                # X = self._get_feature(X)
+                # Y = np.array(map(lambda x:x[1],data)).astype(np.float32)
+                X = np.array(map(lambda x:x[0], data)).astype(np.float32)
+                Y = np.array(map(lambda x:x[1], data)).astype(np.float32)
 
             else:
                 # list of (2,sr*length)
-                X = filter(lambda y:y[0] is not None,signal)
-                X = np.array(X).astype(np.float32)
-                X = self._get_feature(X)
+                # X = filter(lambda y:y[0] is not None,signal)
+                # X = np.array(X).astype(np.float32)
+                # X = self._get_feature(X)
+                X = filter(lambda x:x[0] is not None, signal)
                 Y = -1. # null data
 
             print(X.shape,Y.shape)
@@ -162,9 +176,9 @@ class MSD(IndexableDataset):
             print(e)
             print([x.shape for x in X])
             # raise Exception
-            return -1,-1,request
+            return -1, -1, request
         else:
-            return X,Y,request
+            return X, Y, request
 
     def _get_feature(self,X):
         """"""

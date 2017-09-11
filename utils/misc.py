@@ -147,7 +147,7 @@ def load_audio(fn, sr=None):
 
             # resampling for outliers
             if (sr is not None) and (int(sr_file) != int(sr)):
-                print('resample!')
+                # print('resample!')
                 y = librosa.resample(
                     y, sr_file, sr,
                     res_type='kaiser_fast'
@@ -177,7 +177,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         n_ch = sox.file_info.channels(fn)
 
         if length < dur:
-            print('{} too short!(1) : {} / {}'.format(fn, length, dur))
+            # print('{} too short!(1) : {} / {}'.format(fn, length, dur))
             return None
 
         if n_ch < 2:
@@ -219,7 +219,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         src_len = y.shape[1]
         thresh = 0.95 * trg_len
         if src_len < thresh:
-            print('too short! (2)')
+            # print('too short! (2)')
             return None
 
         elif src_len < trg_len and src_len >= thresh:
@@ -239,6 +239,16 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         return None
     else:
         return y
+
+def zero_pad_signals(signal):
+    """"""
+    longest_len = np.max([s.shape[-1] for s in signal])
+    S = np.zeros((len(signal), 2, longest_len))
+    for i, s in enumerate(signal):
+        if s is None:
+            continue
+        S[i,:,:s.shape[-1]] = s
+    return S.astype(np.float32)
 
 
 def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3,
