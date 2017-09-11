@@ -3,6 +3,9 @@ import tempfile
 import subprocess
 from functools import partial
 
+import numpy as np
+import pandas as pd
+
 import sox
 from tqdm import tqdm
 
@@ -38,15 +41,14 @@ def _checker(inputs, audio_root):
     fn = os.path.join(audio_root, f)
     return tid, get_file_info(fn)
 
-def check_all_info(audio_root, path_map):
+def check_all_info(audio_root, path_map, n_jobs=8):
     """"""
     audio_info = pmap(
         partial(_checker, audio_root=audio_root),
         path_map.items(),
-        n_jobs=4, verbose=True
+        n_jobs=n_jobs, verbose=True
     )
     return audio_info
-
 
 def _resample_n_save(fn, sr, out_fn=None):
     """"""
@@ -57,9 +59,19 @@ def _resample_n_save(fn, sr, out_fn=None):
     subprocess.call(cmd)
 
 
-def resample_all_22k(fns):
+def resample_all_22k(root, info_fn):
     """"""
+    audio_info = pd.read_pickle(info_fn)
+    not_nan = ~np.isnan(audio_info['sr']).as_matrix()
+    not_22k = audio_info['sr'] != 22050
+    target_fns = audio_info[not_nan * not_22k]['path']
+
+    target_fns = [os.path.join(root, fn)
+                  for tid, fn in target_fns.iteritems()]
     pmap(
         partial(_resample_n_save, sr=22050),
-        fns, n_jobs=8, verbose=True
+        target_fns, n_jobs=8, verbose=True
     )
+
+if __name__ == "__main__":
+    fire.Fire(check_all_info)

@@ -146,14 +146,15 @@ def load_audio(fn, sr=None):
             y = y.T
 
             # resampling for outliers
-            if (sr is not None) and (sr_file != sr):
+            if (sr is not None) and (int(sr_file) != int(sr)):
+                print('resample!')
                 y = librosa.resample(
                     y, sr_file, sr,
                     res_type='kaiser_fast'
                 )
 
             # process mono
-            if mono:
+            if y.shape[0] < 2:
                 y = np.repeat(y[None,:],2,axis=0)
 
     except Exception as e:
@@ -166,6 +167,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
     """
     """
     if not os.path.exists(fn):
+        print('file not exists!')
         return None
 
     try:
@@ -175,6 +177,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         n_ch = sox.file_info.channels(fn)
 
         if length < dur:
+            print('{} too short!(1) : {} / {}'.format(fn, length, dur))
             return None
 
         if n_ch < 2:
@@ -187,19 +190,20 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
                 ['mpg123','-w',tmpf.name,'-q',fn]
             )
 
-            st_sec = np.random.choice(int((length-dur)*10))/10.
-            st = int(st_sec * sr_org)
+            # st_sec = np.random.choice(int((length-dur)*10))/10.
+            # st = int(st_sec * sr_org)
+            st = np.random.choice(int((length - dur) * sr_org))
             n_frames = int(dur * sr_org)
 
             y,sr_file = sf.read(
-                tmpf.name, frames=n_frames, start=st,
-                always_2d=True, dtype='float32')
+                tmpf.name, always_2d=True, dtype='float32')
+            y = y[st:st+n_frames]
 
             # transpose & crop
             y = y.T
 
             # resampling for outliers
-            if sr_file != sr:
+            if int(sr_file) != int(sr):
                 y = librosa.resample(
                     y,sr_file,sr,
                     res_type='kaiser_fast'
@@ -213,12 +217,13 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         # pad it with zeros
         trg_len = sr * dur
         src_len = y.shape[1]
-        thresh = 0.75 * trg_len
+        thresh = 0.95 * trg_len
         if src_len < thresh:
+            print('too short! (2)')
             return None
 
         elif src_len < trg_len and src_len >= thresh:
-            npad = trg_len - src_len
+            npad = int(trg_len - src_len)
             y = np.concatenate(
                 [y, np.zeros((y.shape[0],npad))],
                 axis=-1
