@@ -1,6 +1,7 @@
 import os
 
 import namedtupled
+from itertools import izip_longest
 
 import numpy as np
 
@@ -13,7 +14,7 @@ import h5py
 
 from model.model import Model
 from model.helper import load_check_point, get_debug_funcs
-from utils.misc import get_in_shape, get_layer
+from utils.misc import get_in_shape, get_layer, pmap, load_audio
 
 import fire
 import tqdm
@@ -86,33 +87,39 @@ class FeatureExtractor:
         hop_samples = int(self.hop_sz * self.sr)
 
         for (ix, fn, label) in tqdm.tqdm(self.db_info):
+            try:
+                # load audio
+                y, _ = load_audio(fn, sr=self.sr)
 
-            # load audio
-            y, _ = librosa.load(fn, sr=self.sr, res_type='kaiser_fast')
-            if y.ndim < 2:
-                y = np.repeat(y[None,:],2,axis=0)
+                # y, _ = librosa.load(fn, sr=self.sr, res_type='kaiser_fast')
+                # if y.ndim < 2:
+                #     y = np.repeat(y[None,:],2,axis=0)
 
-            end = y.shape[-1]
-            X = []
-            Z = {target:[] for target in self.targets}
-            for j in xrange(0, end, hop_samples):
-                slc = slice(j, j + self.in_shape[-1])
-                x_chunk = y[:,slc][None,:,:]
+                end = y.shape[-1]
+                X = []
+                Z = {target:[] for target in self.targets}
+                for j in xrange(0, end, hop_samples):
+                    slc = slice(j, j + self.in_shape[-1])
+                    x_chunk = y[:,slc][None,:,:]
 
-                if x_chunk.shape[-1] < self.in_shape[-1]:
-                    continue
+                    if x_chunk.shape[-1] < self.in_shape[-1]:
+                        continue
 
-                X.append(self.model.feature(x_chunk))
+                    X.append(self.model.feature(x_chunk))
 
+                    for target in self.targets:
+                        Z[target].append(self.model.predict(target, x_chunk))
+
+                ix = int(ix)
+                self.hf['X'][ix, :m] = np.mean(X, axis=0)
+                self.hf['X'][ix, m:] = np.std(X, axis=0)
                 for target in self.targets:
-                    Z[target].append(self.model.predict(target, x_chunk))
+                    self.hf['Z'][target][ix] = np.mean(Z[target], axis=0)
+                self.hf['y'][ix] = self.label_encoder.transform([label])[0]
 
-            ix = int(ix)
-            self.hf['X'][ix, :m] = np.mean(X, axis=0)
-            self.hf['X'][ix, m:] = np.std(X, axis=0)
-            for target in self.targets:
-                self.hf['Z'][target][ix] = np.mean(Z[target], axis=0)
-            self.hf['y'][ix] = self.label_encoder.transform([label])[0]
+            except Exception as e:
+                traceback.print_exc()
+                print('[ERROR] file {} has problem!'.format(fn))
 
 
 def main(task, model_state_fn, hop_sz=1., feature_layer='fc.bn.do'):

@@ -17,7 +17,7 @@ import librosa
 import fire
 
 from utils.misc import pmap, load_audio_batch, load_config
-from utils.misc import zero_pad_signals, load_audio
+from utils.misc import zero_pad_signals, load_audio, prepare_sub_batches
 
 class MSD(IndexableDataset):
     """Assuming input datastream is a example of
@@ -37,6 +37,7 @@ class MSD(IndexableDataset):
         self.sr = config.hyper_parameters.sample_rate
         self.length = config.hyper_parameters.patch_length
         self.len_samples = int(self.length * self.sr)
+        self.sub_batch_sz = config.hyper_parameters.sub_batch_size
 
         self.n_fft = config.hyper_parameters.n_fft
         self.hop_length = config.hyper_parameters.hop_size
@@ -115,6 +116,7 @@ class MSD(IndexableDataset):
         # (batch,2,sr*length)
         try:
             batch_sz = len(request)
+            length_sp = int(self.sr * self.length)
 
             # convert index
             request_fn = map(
@@ -128,16 +130,6 @@ class MSD(IndexableDataset):
                 request
             )
 
-            # fetch signal
-            # signal = pmap(
-            #     partial(
-            #         load_audio_batch,
-            #         sr=self.sr,
-            #         dur=self.length
-            #     ),
-            #     request_fn,
-            #     n_jobs=self.n_jobs
-            # )
             signal = pmap(
                 partial(
                     load_audio,
@@ -147,26 +139,24 @@ class MSD(IndexableDataset):
                 n_jobs=self.n_jobs
             )
             signal = [s[0] for s in signal]
-            signal = zero_pad_signals(signal)
+            signal, mask = zero_pad_signals(signal)
 
             if self.target!='self':
                 # fetch target
                 target = map(lambda ix:self.Y[ix],request)
                 data = filter(
-                    lambda y:y[0].sum() > 0,
-                    zip(signal, target)
+                    lambda y:y[1].sum() > length_sp,
+                    zip(signal, mask, target)
                 )
-                # X = np.array(map(lambda x:x[0],data)).astype(np.float32)
-                # X = self._get_feature(X)
-                # Y = np.array(map(lambda x:x[1],data)).astype(np.float32)
-                X = np.array(map(lambda x:x[0], data)).astype(np.float32)
-                Y = np.array(map(lambda x:x[1], data)).astype(np.float32)
+                X = map(lambda x:x[0], data)
+                M = map(lambda x:x[1], data)
+                Y = map(lambda x:x[2], data)
+                X, Y = prepare_sub_batches(
+                    self.sub_batch_sz, length_sp,
+                    X, M, Y)
 
             else:
                 # list of (2,sr*length)
-                # X = filter(lambda y:y[0] is not None,signal)
-                # X = np.array(X).astype(np.float32)
-                # X = self._get_feature(X)
                 X = filter(lambda x:x[0] is not None, signal)
                 Y = -1. # null data
 
@@ -174,7 +164,6 @@ class MSD(IndexableDataset):
 
         except Exception as e:
             print(e)
-            print([x.shape for x in X])
             # raise Exception
             return -1, -1, request
         else:

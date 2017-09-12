@@ -1,6 +1,7 @@
 import os
 import sys
 sys.setrecursionlimit(40000)
+import time
 
 import copy
 import subprocess
@@ -142,6 +143,9 @@ def load_audio(fn, sr=None):
             y, sr_file = sf.read(
                 tmpf.name, always_2d=True, dtype='float32')
 
+            if y.size < 100:
+                raise ValueError('File is too small')
+
             # transpose & crop
             y = y.T
 
@@ -242,14 +246,31 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
 
 def zero_pad_signals(signal):
     """"""
-    longest_len = np.max([s.shape[-1] for s in signal])
+    longest_len = np.max(
+        [s.shape[-1] if s is not None else 0 for s in signal])
     S = np.zeros((len(signal), 2, longest_len))
+    M = np.zeros((len(signal), 2, longest_len)) # mask
     for i, s in enumerate(signal):
-        if s is None:
-            continue
+        if s is None: continue
         S[i,:,:s.shape[-1]] = s
-    return S.astype(np.float32)
+        M[i,:,:s.shape[-1]] = 1
+    return S, M
 
+def prepare_sub_batches(n, dur, signal, mask, target):
+    """"""
+    # prepare n subbatch from batch
+    batch_sz = len(signal)
+    n_ch = signal[0].shape[0]
+
+    X = np.zeros(((n * batch_sz), n_ch, dur))
+    Y = np.zeros(((n * batch_sz), target[0].shape[-1]))
+    for i, x, m, y in zip(range(batch_sz), signal, mask, target):
+        sig_len = len(np.where(m[0]>0)[0])
+        for j in xrange(n):
+            st = np.random.choice(sig_len - dur)
+            X[j * batch_sz + i] = x[:, st:st+dur]
+            Y[j * batch_sz + i] = y
+    return X, Y
 
 def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3,
          verbose=False):
@@ -335,3 +356,26 @@ class GuidedBackprop(ModifiedBackprop):
         dtype = inp.dtype
         return (grd * (inp > 0).astype(dtype) * (grd > 0).astype(dtype),)
 
+def test_signal_batching():
+    sr = 22050
+    min_audio_len = 30 * sr
+    max_audio_len = 60 * sr
+    dur = int(2.5 * sr)
+    n = 64 # num sample in batch
+    m = 20 # num sub batch in batch
+
+    signal = [np.random.rand(n) for n
+              in np.random.randint(
+                  min_audio_len, max_audio_len, size=n)]
+    signal, mask = zero_pad_signals(signal)
+
+    target = [np.random.rand(20) for _ in xrange(n)]
+    target = [t / t.sum() for t in target] # normalize
+
+    t = time.time()
+    X, Y = prepare_sub_batches(m, dur, signal, mask, target)
+    print('took {:.2f} second'.format(time.time() - t))
+    print(X.shape, Y.shape)
+
+if __name__ == "__main__":
+    test_signal_batching()
