@@ -248,8 +248,8 @@ def zero_pad_signals(signal):
     """"""
     longest_len = np.max(
         [s.shape[-1] if s is not None else 0 for s in signal])
-    S = np.zeros((len(signal), 2, longest_len))
-    M = np.zeros((len(signal), 2, longest_len)) # mask
+    S = np.zeros((len(signal), 2, longest_len), dtype=np.float32)
+    M = np.zeros((len(signal), 2, longest_len), dtype=np.int8) # mask
     for i, s in enumerate(signal):
         if s is None: continue
         S[i,:,:s.shape[-1]] = s
