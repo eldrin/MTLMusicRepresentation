@@ -19,16 +19,25 @@ import fire
 
 class ExternalTaskEvaluator:
     """"""
-    def __init__(self, fn):
+    def __init__(self, fns, n_jobs=-1):
         """"""
-        self.data = h5py.File(fn,'r')
-        self.model = LogisticRegression()
+        self.data = []
+        for fn in fns:
+            self.data.append(h5py.File(fn,'r'))
+        if not eval('=='.join(
+            ['"{}"'.format(hf.attrs['dataset']) for hf in self.data])):
+            raise ValueError('[ERROR] All dataset should be same!')
+
+        self.model = LogisticRegression(n_jobs=n_jobs)
 
     def evaluate(self):
         """"""
-        X = self.data['X'][:]
-        y_true = self.data['y'][:]
-        labels = self.data['labels'][:]
+        # concatenate features
+        X = np.concatenate(
+            [data['X'][:] for data in self.data], axis=1)
+
+        y_true = self.data[0]['y'][:]
+        labels = self.data[0]['labels'][:]
 
         X, y_true = self._check_n_fix_data(X, y_true, True)
 
@@ -46,15 +55,17 @@ class ExternalTaskEvaluator:
         normal_samples = np.where(np.isnan(X).sum(axis=1)==0)[0]
 
         if report:
-            print(
-                'Total {:d} NaN samples found'.format(len(nan_samples))
-            )
+            print('Total {:d} NaN samples found'.format(len(nan_samples)))
 
         return X[normal_samples], y[normal_samples]
 
-
-def external_eval(in_fn, out_fn):
-    evaluator = ExternalTaskEvaluator(in_fn)
+def external_eval(in_fns, out_fn, n_jobs=-1):
+    """
+    in_fns : string (separable with separator '-')
+    out_fn : string
+    """
+    in_fns = in_fns.split('-')
+    evaluator = ExternalTaskEvaluator(in_fns, n_jobs)
     res = evaluator.evaluate()
 
     lines = '=================  Classification Report =================='

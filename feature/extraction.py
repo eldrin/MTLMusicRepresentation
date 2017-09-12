@@ -1,4 +1,5 @@
 import os
+import traceback
 
 import namedtupled
 from itertools import izip_longest
@@ -80,6 +81,7 @@ class FeatureExtractor:
             'labels',
             data=np.array(self.label_encoder.classes_, dtype='S')
         )
+        self.hf.attrs['dataset'] = task
 
     def process(self):
         """"""
@@ -87,6 +89,7 @@ class FeatureExtractor:
         hop_samples = int(self.hop_sz * self.sr)
 
         for (ix, fn, label) in tqdm.tqdm(self.db_info):
+            ix = int(ix)
             try:
                 # load audio
                 y, _ = load_audio(fn, sr=self.sr)
@@ -110,16 +113,19 @@ class FeatureExtractor:
                     for target in self.targets:
                         Z[target].append(self.model.predict(target, x_chunk))
 
-                ix = int(ix)
                 self.hf['X'][ix, :m] = np.mean(X, axis=0)
                 self.hf['X'][ix, m:] = np.std(X, axis=0)
                 for target in self.targets:
                     self.hf['Z'][target][ix] = np.mean(Z[target], axis=0)
-                self.hf['y'][ix] = self.label_encoder.transform([label])[0]
 
             except Exception as e:
                 traceback.print_exc()
+                self.hf['X'][ix,:] = np.nan
                 print('[ERROR] file {} has problem!'.format(fn))
+
+            finally:
+                self.hf['y'][ix] = self.label_encoder.transform([label])[0]
+
 
 
 def main(task, model_state_fn, hop_sz=1., feature_layer='fc.bn.do'):

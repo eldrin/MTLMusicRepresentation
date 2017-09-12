@@ -151,7 +151,7 @@ def load_audio(fn, sr=None):
 
             # resampling for outliers
             if (sr is not None) and (int(sr_file) != int(sr)):
-                # print('resample!')
+                print('resample!')
                 y = librosa.resample(
                     y, sr_file, sr,
                     res_type='kaiser_fast'
