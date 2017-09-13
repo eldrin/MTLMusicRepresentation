@@ -92,11 +92,11 @@ class FeatureExtractor:
             ix = int(ix)
             try:
                 # load audio
-                y, _ = load_audio(fn, sr=self.sr)
+                # y, _ = load_audio(fn, sr=self.sr)
 
-                # y, _ = librosa.load(fn, sr=self.sr, res_type='kaiser_fast')
-                # if y.ndim < 2:
-                #     y = np.repeat(y[None,:],2,axis=0)
+                y, _ = librosa.load(fn, sr=self.sr, res_type='kaiser_fast')
+                if y.ndim < 2:
+                    y = np.repeat(y[None,:],2,axis=0)
 
                 end = y.shape[-1]
                 X = []

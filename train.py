@@ -24,10 +24,10 @@ class Trainer:
         # set variables
         self.batch_sz = self.config.hyper_parameters.batch_size
         self.n_subbatch = self.config.hyper_parameters.sub_batch_size
-        n_epoch = self.config.train.n_epoch
-        self.n_epoch = int(n_epoch / self.n_subbatch) + 1
+        self.n_epoch = self.config.train.n_epoch
 
         self.n_iter = self.dstream.n_iter
+        self.n_iter = int(self.n_iter / self.n_subbatch) + 1
         self.check_point_intv = self.config.train.check_point_intv
         self.verbose_frq = self.config.train.verbose_frq
 

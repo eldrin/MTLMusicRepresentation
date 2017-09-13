@@ -1,10 +1,13 @@
 import os
+import time
 import cPickle as pkl
 
 import numpy as np
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.model_selection import cross_val_predict
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.externals import joblib
 
@@ -19,7 +22,7 @@ import fire
 
 class ExternalTaskEvaluator:
     """"""
-    def __init__(self, fns, n_jobs=-1):
+    def __init__(self, fns, standardize=False, n_jobs=-1):
         """"""
         self.data = []
         for fn in fns:
@@ -28,7 +31,24 @@ class ExternalTaskEvaluator:
             ['"{}"'.format(hf.attrs['dataset']) for hf in self.data])):
             raise ValueError('[ERROR] All dataset should be same!')
 
-        self.model = LogisticRegression(n_jobs=n_jobs)
+        # initiate evaluation model
+        # self.model = LogisticRegression(n_jobs=n_jobs)
+        self.model = LogisticRegression(
+            solver='saga', max_iter=100, n_jobs=n_jobs,
+            # multi_class='multinomial'
+            multi_class='ovr'
+        )
+
+        # initiate pre-processor
+        self.standardize = standardize
+        if standardize:
+            self.preproc = StandardScaler()
+        else:
+            self.preproc = FunctionTransformer(lambda x:x)
+
+        # setup pipeline
+        self.pipeline = Pipeline(
+            steps=[('sclr', self.preproc), ('classifier', self.model)])
 
     def evaluate(self):
         """"""
@@ -41,11 +61,13 @@ class ExternalTaskEvaluator:
 
         X, y_true = self._check_n_fix_data(X, y_true, True)
 
-        y_pred = cross_val_predict(self.model, X, y_true, cv=10).astype(int)
+        t = time.time()
+        y_pred = cross_val_predict(self.pipeline, X, y_true, cv=10).astype(int)
+        cv_time = time.time() - t
         cr = classification_report(y_true, y_pred, target_names=labels)
         ac = accuracy_score(y_true, y_pred)
 
-        return {'classification_report':cr, 'accuracy':ac}
+        return {'classification_report':cr, 'accuracy':ac, 'time':cv_time}
 
     @staticmethod
     def _check_n_fix_data(X, y, report=False):
@@ -59,13 +81,13 @@ class ExternalTaskEvaluator:
 
         return X[normal_samples], y[normal_samples]
 
-def external_eval(in_fns, out_fn, n_jobs=-1):
+def external_eval(in_fns, out_fn, standardize=False, n_jobs=-1):
     """
     in_fns : string (separable with separator '-')
     out_fn : string
     """
     in_fns = in_fns.split('-')
-    evaluator = ExternalTaskEvaluator(in_fns, n_jobs)
+    evaluator = ExternalTaskEvaluator(in_fns, standardize, n_jobs)
     res = evaluator.evaluate()
 
     lines = '=================  Classification Report =================='
@@ -73,6 +95,8 @@ def external_eval(in_fns, out_fn, n_jobs=-1):
     lines += res['classification_report']
     lines += '\n'
     lines += 'Overall Accuracy: {:.2%}'.format(res['accuracy'])
+    lines += '\n'
+    lines += 'Time spent: {:.2f} (sec)'.format(res['time'])
 
     print
     print(lines)
