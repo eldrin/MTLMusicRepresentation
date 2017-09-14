@@ -135,7 +135,7 @@ class MXMLyrics(MFTask):
     def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
         """"""
         super(MXMLyrics, self).__init__(n_components, db_fn, n_iter, alg)
-        self.A, self.doc_hash, self.term_hash = read(db_fn)
+        self.A, self.doc_hash, self.term_hash = self.read(db_fn)
 
     @classmethod
     def read(cls, db_fn):
