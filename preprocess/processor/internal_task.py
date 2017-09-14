@@ -172,8 +172,8 @@ class MSDArtist(MFTask):
         A_t = A_t[:, keep_dim_artist] # artist-track subset which has tags
 
         self.A = A_t.T.dot(T) # (n_artist, n_tags)
-        self.doc_hash = tracks_hash_t
-        self.term_hash = tags_hash
+        self.doc_hash = track_hash_t
+        self.term_hash = tag_hash
 
         self.artist_id = np.array(np.argmax(A_t, axis=1)).ravel()
         self.artist_hash = artist_hash
