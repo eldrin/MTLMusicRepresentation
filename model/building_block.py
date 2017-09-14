@@ -4,7 +4,7 @@ from sklearn.externals import joblib
 
 from lasagne import layers as L
 
-from custom_layer import STFTLayer
+from custom_layer import STFTLayer, build_autoencoder
 from utils.misc import get_in_shape
 
 def conv_block(
@@ -155,16 +155,22 @@ def output_block(net, config, non_lin, verbose=True):
 
         out_layer_names.append('out.{}'.format(target))
 
-        net[out_layer_names[-1]] = L.DenseLayer(
-            net['fc'],
-            num_units=n_out,
-            nonlinearity=out_act,
-            name=out_layer_names[-1]
-        )
+        if target == 'self':
+            net[out_layer_names[-1]], net['fc'] = build_autoencoder(
+                net['fc'], nonlinearity='same')
+        else:
+            net[out_layer_names[-1]] = L.DenseLayer(
+                net['fc'],
+                num_units=n_out,
+                nonlinearity=out_act,
+                name=out_layer_names[-1]
+            )
 
     # make a concatation layer just for save/load purpose
     net['IO'] = L.ConcatLayer(
-        [net[target_layer_name] for target_layer_name in out_layer_names],
+        [L.FlattenLayer(net[target_layer_name])
+         if target == 'self' else net[target_layer_name]
+         for target_layer_name in out_layer_names],
         name='IO'
     )
 
