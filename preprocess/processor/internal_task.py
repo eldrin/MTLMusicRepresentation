@@ -169,7 +169,7 @@ class MSDArtist(MFTask):
         keep_dim_track = [track_hash_a[t] for t in track_hash_t.keys()]
         A_t = A[keep_dim_track]
         keep_dim_artist = np.array(A_t.sum(axis=0) > 0).ravel()
-        A_t = A_t[:,keep_dim_artist] # artist-track subset which has tags
+        A_t = A_t[:, keep_dim_artist] # artist-track subset which has tags
 
         self.A = A_t.T.dot(T) # (n_artist, n_tags)
         self.doc_hash = tracks_hash_t
@@ -183,7 +183,7 @@ class MSDArtist(MFTask):
     def read(cls, db_fn):
         """"""
         # Load Artist data
-        with sqlite3.connect(db_fn['artist']) as conn:
+        with sqlite3.connect(db_fn) as conn:
             c = conn.cursor()
             triplet = [
                 (r[0], r[1], 1) for r
