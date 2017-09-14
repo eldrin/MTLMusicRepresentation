@@ -208,7 +208,7 @@ class MSDArtist(MFTask):
         else:
             U_reassign = self.U[self.artist_id]
 
-        self.data = {
+        return {
             'item_factors':U_reassign,
             'term_factors':self.V,
             'tids':self.doc_hash.keys(),
