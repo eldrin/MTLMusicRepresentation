@@ -19,4 +19,5 @@ config.json
 # all feature files
 *.h5
 
-
+# local ignoring only for 177
+utils/local_utility.py
