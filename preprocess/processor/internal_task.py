@@ -166,15 +166,19 @@ class MSDArtist(MFTask):
         T, track_hash_t, tag_hash = LastFMTag.read(db_fn['tag'])
 
         # filter artist matrix
+        print(A.shape)
         keep_dim_track = [track_hash_a[t] for t in track_hash_t.keys()]
         A_t = A[keep_dim_track]
+        print(A_t.shape)
         keep_dim_artist = np.array(A_t.sum(axis=0) > 0).ravel()
         A_t = A_t[:, keep_dim_artist] # artist-track subset which has tags
+        print(A_t.shape)
 
         self.A = A_t.T.dot(T) # (n_artist, n_tags)
         self.doc_hash = track_hash_t
         self.term_hash = tag_hash
 
+        print(len(artist_hash), len(keep_dim_artist))
         self.artist_id = np.array(np.argmax(A_t, axis=1)).ravel()
         self.artist_hash = artist_hash
         self.artists = np.array(artist_hash.keys())[keep_dim_artist]
