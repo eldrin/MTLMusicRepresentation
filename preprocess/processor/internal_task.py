@@ -197,7 +197,7 @@ class MSDArtist(MFTask):
 
             # artist_hash = OrderedDict(
             #     [(v, k) for k, v in c.execute('SELECT * FROM artists')])
-            artist_filter = set(map(lambda x:str(x[1]), triplet))
+            artist_filter = set(map(lambda x:x[1], triplet))
             artist_hash = OrderedDict(
                 [(v, k) for k, v in enumerate(artist_filter)])
             tracks = set(map(lambda x:str(x[0]), triplet))
