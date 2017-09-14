@@ -189,9 +189,8 @@ class MSDArtist(MFTask):
                 (r[0], r[1], 1) for r
                 in c.execute('SELECT track_key, artist_id FROM tracks')]
 
-            artist_hash = [
-                (v,k) for k, v in c.execute(
-                'SELECT * FROM artists').fetchall()]
+            artist_hash = OrderedDict(
+                [(v, k) for k, v in c.execute('SELECT * FROM artists')])
             tracks = set(map(lambda x:str(x[0]), triplet))
             track_hash = OrderedDict([(v, k) for k, v in enumerate(tracks)])
 
