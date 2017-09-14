@@ -1,4 +1,5 @@
 import os
+import traceback
 
 from utils.misc import get_py_logger
 from helper import *
@@ -61,6 +62,7 @@ def prepare_task(task, out_fn, k=50, n_iter=100, subsample=0.05, split=0.1):
 
     except Exception as e:
         logger.error('{}'.format(e))
+        traceback.print_exc()
         raise e
 
 if __name__ == "__main__":
