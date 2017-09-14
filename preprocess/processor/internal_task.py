@@ -196,7 +196,7 @@ class MSDArtist(MFTask):
             track_hash = OrderedDict([(v, k) for k, v in enumerate(tracks)])
 
         A = triplet2sparse(triplet, track_hash)
-        return A, track_hash, artist_hash
+        return A.tocsr(), track_hash, artist_hash
 
     @property
     def data(self):
