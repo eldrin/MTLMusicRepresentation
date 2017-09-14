@@ -4,11 +4,11 @@ DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 # TODO: currently installation of numba-plsa must be done manually
 #       can automate?
-sys.path.append(os.path.join(DIR_PATH,'../../numba-plsa/'))
+sys.path.append(os.path.join(DIR_PATH,'../../../numba-plsa/'))
 
 # TODO: currently installation of wrmf must be done manually
 #       can automate?
-sys.path.append(os.path.join(DIR_PATH,'../../wmf/'))
+sys.path.append(os.path.join(DIR_PATH,'../../../wmf/'))
 
 from sklearn.decomposition import LatentDirichletAllocation as LDA
 from numba_plsa.plsa import plsa
@@ -19,20 +19,17 @@ from wmf import log_surplus_confidence_matrix, factorize, recompute_factors
 # =====================================================================
 class MatrixFactorization:
     """"""
-    def __init__(self, k, A, row_hash, column_hash, alg='plsa'):
+    def __init__(self, k, n_iter=100, alg='plsa'):
         """"""
         self.k = k
-        self.data = A
-        self.column_hash = column_hash
-        self.row_hash = row_hash
 
         # assign main function
         if alg == 'plsa':
-            self.alg = PLSA(self.k)
+            self.alg = PLSA(self.k, n_iter=n_iter)
         elif alg == 'lda':
-            self.alg = LDA(self.k, n_jobs=-1)
+            self.alg = LDA(self.k, max_iter=n_iter, n_jobs=-1)
         elif alg == 'wrmf':
-            self.alg = WRMF(self.k)
+            self.alg = WRMF(self.k, n_iter=n_iter)
         else:
             raise ValueError(
                 '[ERROR] {} is not supported algorithm!'.format(alg)
@@ -50,7 +47,7 @@ class MatrixFactorization:
 
 class PLSA:
     """ Simple wrapper object for sklearn-style interface for numba-plsa """
-    def __init__(self, n_components, min_count=1, n_iter=30, method='numba'):
+    def __init__(self, n_components, min_count=1, n_iter=100, method='numba'):
         """"""
         self.k = n_components
         self.min_count = min_count
@@ -63,6 +60,7 @@ class PLSA:
             X, self.k, self.n_iter, self.min_count, self.method)
 
         return transformed
+
 
 class WRMF:
     """ Simple wrapper object for sklearn-style interface for wmf (benanne) """

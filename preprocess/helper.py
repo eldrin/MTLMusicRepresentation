@@ -1,91 +1,11 @@
 import copy
 import random
-from collections import OrderedDict, Iterable
-import sqlite3
+from collections import Iterable
 
 import numpy as np
 import pandas as pd
 
 from scipy import sparse as sp
-from sklearn.mixture import GaussianMixture
-from processor import MatrixFactorization
-
-from helper import densify_trp_df
-
-# =====================================================================
-# functions for reading task specific raw data
-# =====================================================================
-def read_pref(db_fn):
-    """"""
-    with sqlite3.connect(db_fn) as conn:
-        c = conn.cursor()
-        song2track = OrderedDict(
-            [(r[1], r[2]) for r in c.execute('SELECT * FROM songtrack')])
-        tracks = OrderedDict(
-            [(r[0], r[1]) for r in c.execute('SELECT * FROM tracks')])
-        triplet = [(r[1], tracks[song2track[r[2]]], r[3])
-                   for r in c.execute('SELECT * FROM taste_summary')]
-
-        tids = set([r[1] for r in triplet])
-        tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
-        uids = set([r[0] for r in triplet])
-        uids_hash = OrderedDict([(v,k) for k,v in enumerate(uids)])
-
-    n_users = len(uids)
-    n_tracks = len(tids)
-
-    A = sp.coo_matrix(
-        (
-            map(lambda x:int(x[2]), triplet),
-            (
-                map(lambda x:int(uids_hash[x[0]]), triplet),
-                map(lambda x:int(tids_hash[x[1]]), triplet)
-            )
-        ),
-        shape=(n_users, n_tracks)
-    ) # (n_users, n_items)
-    A = A.tocsr().T # (n_items, n_users)
-    return A, tids_hash, uids_hash
-
-
-def read_tag(db_fn):
-    """"""
-    with sqlite3.connect(db_fn) as conn:
-        c = conn.cursor()
-
-        triplet = [
-            (r[0]-1, r[1]-1, r[2])
-            for r in c.execute('SELECT * FROM tid_tag')
-        ]
-
-        tags = [r[0] for r in c.execute('SELECT * FROM tags')]
-        tags_hash = OrderedDict([(v,k) for k,v in enumerate(tags)])
-        tids = [r[0] for r in c.execute('SELECT * FROM tids')]
-        tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
-
-    triplet = [(r[0], r[1], r[2]+1) if r[2]==0 else r for r in triplet]
-
-    A = sp.coo_matrix(
-        (
-            map(lambda x:int(x[2]), triplet),
-            (
-                map(lambda x:int(x[0]), triplet),
-                map(lambda x:int(x[1]), triplet)
-            )
-        ),
-        shape=(len(tids), len(tags))
-    ) # (n_items, n_tags)
-    return A, tids_hash, tags_hash
-
-
-def read_bpm(db_fn):
-    """"""
-    data = joblib.load(db_fn)
-    A = data['item_factors']
-    tids = data['tids']
-    tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
-
-    return A, tids_hash
 
 # =====================================================================
 # functions for splitting task data
@@ -175,45 +95,6 @@ def split_tag(A, tids_hash, train_ratio=0.9):
     Avl = A[[tids_hash[i] for i in tids_valid]]
 
     return (Atr, Avl), (tids_train, tids_valid)
-
-# =====================================================================
-# functions for processing task specific raw data
-# =====================================================================
-def process_pref(k, A, i_hash, u_hash, alg='plsa'):
-    """"""
-    mf = MatrixFactorization(k, A, i_hash, u_hash, alg)
-    U = mf.fit_transform(A)
-    V = mf.components_
-    return U, V
-
-def process_tag(k, A, i_hash, t_hash, alg='plsa'):
-    """"""
-    mf = MatrixFactorization(k, A, i_hash, t_hash, alg)
-    U = mf.fit_transform(A)
-    V = mf.components_
-    return U, V
-
-def process_bpm(k, A, i_hash, alg='gmm'):
-    """"""
-    gmm = GaussianMixture(k)
-    gmm.fit(A)
-    U = gmm.predict_proba(A)
-    return U
-
-
-# =====================================================================
-# functions for saving processed results
-# =====================================================================
-def save(fn, item_factors, term_factors, item_ids, term_ids):
-    """"""
-    data = {
-        'item_factors':item_factors,
-        'term_factors':term_factors,
-        'tids':item_ids, # track ids
-        'uids':term_ids
-    }
-    joblib.dump(data, fn)
-
 
 # =====================================================================
 # functions for misc processes 

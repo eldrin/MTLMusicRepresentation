@@ -23,7 +23,8 @@ import tqdm
 DATASET_FNS = {
     'GTZAN':'/mnt/bulk2/datasets/GTZAN/GTZAN.dataset.info',
     'Ballroom':'/mnt/bulk2/datasets/Ballroom/Ballroom.dataset.info',
-    'FMA':'/mnt/bulk2/datasets/FMA/FMA_MEDIUM.dataset.info'
+    'FMA':'/mnt/bulk2/datasets/FMA/FMA_MEDIUM.dataset.info',
+    'BallroomExt':'/mnt/bulk2/datasets/BallroomExt/BallroomExt.dataset.info'
 }
 
 class FeatureExtractor:

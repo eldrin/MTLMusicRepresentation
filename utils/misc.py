@@ -105,13 +105,22 @@ def get_loggers(config):
     log_fn = os.path.join(config.paths.log, fn + '.log')
 
     # init standard logger
+    pylog = get_py_logger(log_fn)
+
+    # init tensorboard logger
+    tblog.configure(os.path.join(config.paths.tblog,fn))
+
+    return pylog, tblog
+
+def get_py_logger(fn):
+    """"""
     logFormatter = logging.Formatter(
         "%(asctime)s [%(threadName)-12.12s][%(levelname)-5.5s]  %(message)s"
     )
     rootLogger = logging.getLogger()
     rootLogger.setLevel(logging.DEBUG)
 
-    fileHandler = logging.FileHandler(log_fn)
+    fileHandler = logging.FileHandler(fn)
     fileHandler.setFormatter(logFormatter)
     rootLogger.addHandler(fileHandler)
 
@@ -119,10 +128,7 @@ def get_loggers(config):
     consoleHandler.setFormatter(logFormatter)
     rootLogger.addHandler(consoleHandler)
 
-    # init tensorboard logger
-    tblog.configure(os.path.join(config.paths.tblog,fn))
-
-    return rootLogger, tblog
+    return rootLogger
 
 def preemphasis(signal):
     return lfilter([1, -0.70], 1, signal)
@@ -376,6 +382,30 @@ def test_signal_batching():
     X, Y = prepare_sub_batches(m, dur, signal, mask, target)
     print('took {:.2f} second'.format(time.time() - t))
     print(X.shape, Y.shape)
+
+
+def triplet2sparse(triplet, doc_hash=None, term_hash=None):
+    """"""
+    val = map(lambda x:x[2], triplet)
+    if doc_hash is None:
+        row = map(lambda x:x[0], triplet)
+        n_row = len(set(row))
+    else:
+        row = map(lambda x:doc_hash[x[0]], triplet)
+        n_row = len(doc_hash)
+
+    if term_hash is None:
+        col = map(lambda x:x[1], triplet)
+        n_col = len(set(col))
+    else:
+        col = map(lambda x:term_hash[x[1]], triplet)
+        n_col = len(term_hash)
+
+    A = sp.coo_matrix(
+        (val, (row, col)), shape=(n_row, n_col), dtype=int
+    ) # (n_items, n_words)
+
+    return A
 
 if __name__ == "__main__":
     test_signal_batching()
