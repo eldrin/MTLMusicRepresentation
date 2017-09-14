@@ -144,7 +144,7 @@ class MXMLyrics(MFTask):
             c = conn.cursor()
 
             triplet = c.execute(
-                'SELECT track_id, word, count FROM lyrics').fetchall()
+                'SELECT track_id, word, count FROM lyrics')
 
             tracks = c.execute('SELECT DISTINCT track_id FROM lyrics').fetchall()
             track_hash = OrderedDict([(v[0],k) for k, v in enumerate(tracks)])
@@ -162,7 +162,7 @@ class MSDArtist(MFTask):
     def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
         """"""
         super(MSDArtist, self).__init__(n_components, db_fn, n_iter, alg)
-        A, track_hash_a, self.artist_hash = read(db_fn['artist'])
+        A, track_hash_a, self.artist_hash = self.read(db_fn['artist'])
         T, track_hash_t, self.tag_hash = LastFMTag.read(db_fn['tag'])
 
         # filter artist matrix
