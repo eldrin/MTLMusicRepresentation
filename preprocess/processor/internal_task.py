@@ -162,8 +162,8 @@ class MSDArtist(MFTask):
     def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
         """"""
         super(MSDArtist, self).__init__(n_components, db_fn, n_iter, alg)
-        A, track_hash_a, self.artist_hash = self.read(db_fn['artist'])
-        T, track_hash_t, self.tag_hash = LastFMTag.read(db_fn['tag'])
+        A, track_hash_a, artist_hash = self.read(db_fn['artist'])
+        T, track_hash_t, tag_hash = LastFMTag.read(db_fn['tag'])
 
         # filter artist matrix
         keep_dim_track = [track_hash_a[t] for t in track_hash_t.keys()]
