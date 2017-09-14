@@ -65,15 +65,15 @@ class MSD(IndexableDataset):
                 )
                 split_fn = os.path.join(
                     self.config.paths.meta_data.root, split_fn)
-
-                self.internal_idx = joblib.load(split_fn)[self.which_set]
-                target = joblib.load(target_fn)
-
                 target_fn = eval(
                     'self.config.paths.meta_data.targets.{}'.format(self.target)
                 )
                 target_fn = os.path.join(
                     self.config.paths.meta_data.root, target_fn)
+
+
+                self.internal_idx = joblib.load(split_fn)[self.which_set]
+                target = joblib.load(target_fn)
 
                 target_ref = {v:k for k,v in enumerate(target['tids'])}
                 self.Y = target['item_factors']
