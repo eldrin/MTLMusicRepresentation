@@ -194,7 +194,6 @@ class MSDArtist(MFTask):
             triplet = [
                 (r[0], artist[r[1]], 1) for r
                 in c.execute('SELECT track_key, artist_id FROM tracks')]
-            print('triplet baked!')
 
             # artist_hash = OrderedDict(
             #     [(v, k) for k, v in c.execute('SELECT * FROM artists')])
@@ -204,7 +203,7 @@ class MSDArtist(MFTask):
             tracks = set(map(lambda x:str(x[0]), triplet))
             track_hash = OrderedDict([(v, k) for k, v in enumerate(tracks)])
 
-        A = triplet2sparse(triplet, track_hash)
+        A = triplet2sparse(triplet, track_hash, artist_hash)
         return A.tocsr(), track_hash, artist_hash
 
     @property
