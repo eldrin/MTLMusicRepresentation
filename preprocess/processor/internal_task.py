@@ -24,8 +24,8 @@ class BaseInternalTask:
 
         self.U = None
         self.V = None
-        self.doc_hash = None
-        self.term_hash = None
+        self.doc_hash = OrderedDict()
+        self.term_hash = OrderedDict()
 
     @abstractmethod
     def process(self):
