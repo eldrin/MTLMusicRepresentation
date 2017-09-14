@@ -189,12 +189,17 @@ class MSDArtist(MFTask):
         # Load Artist data
         with sqlite3.connect(db_fn) as conn:
             c = conn.cursor()
+            artist = [r[1] for r in c.execute(
+                      'SELECT * FROM artists').fetchall()]
             triplet = [
-                (r[0], r[1], 1) for r
+                (r[0], artist[r[1]], 1) for r
                 in c.execute('SELECT track_key, artist_id FROM tracks')]
 
+            # artist_hash = OrderedDict(
+            #     [(v, k) for k, v in c.execute('SELECT * FROM artists')])
+            artist_filter = set(map(lambda x:str(x[1]), triplet))
             artist_hash = OrderedDict(
-                [(v, k) for k, v in c.execute('SELECT * FROM artists')])
+                [(v, k) for k, v in enumerate(artist_filter)])
             tracks = set(map(lambda x:str(x[0]), triplet))
             track_hash = OrderedDict([(v, k) for k, v in enumerate(tracks)])
 
