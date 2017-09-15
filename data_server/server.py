@@ -1,4 +1,5 @@
 import os
+import copy
 import cPickle as pkl
 
 import numpy as np
@@ -160,7 +161,7 @@ class MSD(IndexableDataset):
                 )
                 X = map(lambda x:x[0], data)
                 M = map(lambda x:x[1], data)
-                Y = X.copy()
+                Y = copy.deepcopy(X)
 
             # prepare sub batch
             X, Y = prepare_sub_batches(
