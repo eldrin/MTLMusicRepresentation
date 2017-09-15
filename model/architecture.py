@@ -15,7 +15,7 @@ def build_2dconv_clf_deep(config, **kwargs):
 
     # network dict
     net = OrderedDict()
-    net = input_block(net, config)
+    net, sigma = input_block(net, config)
     net = conv_block(
         net, n_convs=1, n_filters=64, filter_size=(5,5),
         stride=(2,2), pool_size=(2,2), nonlinearity=non_lin,
@@ -53,7 +53,7 @@ def build_2dconv_clf_deep(config, **kwargs):
     #     n_params[layer.name] = L.count_params(layer)
     # print(sum(n_params.values()))
 
-    return net
+    return net, sigma
 
 
 def build_2dconv_clf_small(config, **kwargs):
@@ -68,7 +68,7 @@ def build_2dconv_clf_small(config, **kwargs):
 
     # network dict
     net = OrderedDict()
-    net = input_block(net, config)
+    net, sigma = input_block(net, config)
     net = conv_block(
         net, n_convs=1, n_filters=16, filter_size=(5,5),
         stride=(2,2), pool_size=(2,2), nonlinearity=non_lin,
@@ -101,4 +101,4 @@ def build_2dconv_clf_small(config, **kwargs):
     #     n_params[layer.name] = L.count_params(layer)
     # print(sum(n_params.values()))
 
-    return net
+    return net, sigma

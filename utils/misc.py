@@ -262,14 +262,20 @@ def zero_pad_signals(signal):
         M[i,:,:s.shape[-1]] = 1
     return S, M
 
-def prepare_sub_batches(n, dur, signal, mask, target):
+def prepare_sub_batches(n, dur, signal, mask, target=None):
     """"""
     # prepare n subbatch from batch
     batch_sz = len(signal)
     n_ch = signal[0].shape[0]
 
+    if target is None:
+        target_dim = 1
+        target = -np.ones((batch_sz, target_dim)) # dummy values
+    else:
+        target_dim = target[0].shape[-1]
+
     X = np.zeros(((n * batch_sz), n_ch, dur))
-    Y = np.zeros(((n * batch_sz), target[0].shape[-1]))
+    Y = np.zeros(((n * batch_sz), target_dim))
     for i, x, m, y in zip(range(batch_sz), signal, mask, target):
         sig_len = len(np.where(m[0]>0)[0])
         for j in xrange(n):

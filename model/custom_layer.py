@@ -8,7 +8,7 @@ from theano import config
 
 import lasagne
 from lasagne.layers import get_all_layers
-from lasagne.layers import MergeLayer, Layer, InputLayer
+from lasagne.layers import MergeLayer, Layer, InputLayer, InverseLayer
 from lasagne.layers import NonlinearityLayer, BiasLayer
 from lasagne.layers import DropoutLayer, GaussianNoiseLayer
 

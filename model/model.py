@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from functools import wraps
 
 from helper import load_check_point, save_check_point
@@ -16,6 +17,18 @@ def check_task(f):
 
     return _check_task
 
+def check_autoencoder(f):
+    @wraps(f)
+    def _check_autoencoder(self, task, *args, **kwargs):
+        """"""
+        if task == 'self':
+            self.corruption_var.set_value(self.corruption_rate)
+        res = f(self, task, *args, **kwargs)
+        if task == 'self':
+            self.corruption_var.set_value(0.)
+        return res
+    return _check_autoencoder
+
 
 class Model:
     """"""
@@ -23,6 +36,7 @@ class Model:
         self, config, feature_layer=None, *args, **kwargs):
         """"""
         self.config = config
+        self.corruption_rate = config.hyper_parameters.input_noise_scale
 
         # load model builder
         exec('from architecture import build_{} as network_arch'.format(
@@ -30,11 +44,12 @@ class Model:
         )
 
         # load model
-        self.net = network_arch(config)
-        self.iter, self.net = load_check_point(
-            self.net, config
-        )
+        self.net, self.corruption_var = network_arch(config)
+
         # load trained model
+        self.iter, self.net = load_check_point(self.net, config)
+
+        # get train ops
         funcs = get_train_funcs(self.net, config, feature_layer=feature_layer)
 
         # assign instance method
@@ -48,17 +63,20 @@ class Model:
             self._predict[target] = funcs[target]['predict']
 
     @check_task
+    @check_autoencoder
     def partial_fit(self, task, X, y):
         """"""
         self._partial_fit[task](X,y)
         self.iter += 1
 
     @check_task
+    @check_autoencoder
     def cost(self, task, X, y):
         """"""
         return self._cost[task](X, y).item()
 
     @check_task
+    @check_autoencoder
     def predict(self, task, X):
         """"""
         return self._predict[task](X)

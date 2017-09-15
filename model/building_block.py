@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn.externals import joblib
 
+import theano
 from lasagne import layers as L
 
 from custom_layer import STFTLayer, build_autoencoder
@@ -78,9 +79,13 @@ def input_block(net, config, verbose=True):
         name='input'
     )
 
+    sigma = theano.shared(np.array(0.,dtype=np.float32), name='noise_controller')
+    net['noise'] = L.GaussianNoiseLayer(
+        net['input'], sigma=sigma, name='input_corruption')
+
     net['stft'] = STFTLayer(
         L.ReshapeLayer(
-            net['input'],
+            net['noise'],
             ([0],[1],[2],1),
             name='reshape'
         ),
@@ -108,7 +113,7 @@ def input_block(net, config, verbose=True):
         print(net['stft'].output_shape)
         print(net['stft.pl'].output_shape)
 
-    return net
+    return net, sigma
 
 
 def output_block(net, config, non_lin, verbose=True):

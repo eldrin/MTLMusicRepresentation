@@ -142,7 +142,7 @@ class MSD(IndexableDataset):
             signal = [s[0] for s in signal]
             signal, mask = zero_pad_signals(signal)
 
-            if self.target!='self':
+            if self.target != 'self':
                 # fetch target
                 target = map(lambda ix:self.Y[ix],request)
                 data = filter(
@@ -152,14 +152,20 @@ class MSD(IndexableDataset):
                 X = map(lambda x:x[0], data)
                 M = map(lambda x:x[1], data)
                 Y = map(lambda x:x[2], data)
-                X, Y = prepare_sub_batches(
-                    self.sub_batch_sz, length_sp,
-                    X, M, Y)
-
             else:
                 # list of (2,sr*length)
-                X = filter(lambda x:x[0] is not None, signal)
-                Y = -1. # null data
+                data = filter(
+                    lambda x:x[1].sum() > 0,
+                    zip(signal, mask)
+                )
+                X = map(lambda x:x[0], data)
+                M = map(lambda x:x[1], data)
+                Y = X.copy()
+
+            # prepare sub batch
+            X, Y = prepare_sub_batches(
+                self.sub_batch_sz, length_sp,
+                X, M, Y)
 
             print(X.shape,Y.shape)
 

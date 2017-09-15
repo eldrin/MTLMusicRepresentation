@@ -33,18 +33,15 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         out_layer_name = 'out.{}'.format(target)
 
         layers = L.get_all_layers(net[out_layer_name])
+        Y = T.matrix('target')
 
         if target == 'self':
             loss = lasagne.objectives.squared_error
-            Y = layers[0].input_var
-
         else:
             if net[out_layer_name].nonlinearity == softmax:
                 loss = lasagne.objectives.categorical_crossentropy
             elif net[out_layer_name].nonlinearity == linear:
                 loss = lasagne.objectives.squared_error
-
-            Y = T.matrix('target')
 
         O = L.get_output(net[out_layer_name],deterministic=False)
         O_vl = L.get_output(net[out_layer_name],deterministic=True)
@@ -65,10 +62,7 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         updates = optimizer(cost,train_params,learning_rate=lr)
 
         # compile functions
-        if target == 'self':
-            cost_rel_inputs = [layers[0].input_var]
-        else:
-            cost_rel_inputs = [layers[0].input_var,Y]
+        cost_rel_inputs = [layers[0].input_var,Y]
         functions[target] = {}
 
         functions[target]['train'] = theano.function(
