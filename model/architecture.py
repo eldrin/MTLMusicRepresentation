@@ -48,11 +48,6 @@ def build_2dconv_clf_deep(config, **kwargs):
     )
     net = output_block(net, config, non_lin)
 
-    # n_params = {}
-    # for layer in L.get_all_layers(net['out']):
-    #     n_params[layer.name] = L.count_params(layer)
-    # print(sum(n_params.values()))
-
     return net, sigma
 
 
@@ -95,10 +90,5 @@ def build_2dconv_clf_small(config, **kwargs):
         batch_norm=True, name='conv5', verbose=True
     )
     net = output_block(net, config, non_lin)
-
-    # n_params = {}
-    # for layer in L.get_all_layers(net['out']):
-    #     n_params[layer.name] = L.count_params(layer)
-    # print(sum(n_params.values()))
 
     return net, sigma

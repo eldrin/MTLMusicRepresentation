@@ -164,9 +164,10 @@ class MSD(IndexableDataset):
                 Y = copy.deepcopy(X)
 
             # prepare sub batch
-            X, Y = prepare_sub_batches(
+            X, _ = prepare_sub_batches(
                 self.sub_batch_sz, length_sp,
-                X, M, Y)
+                X, M)
+            Y = X.copy()
 
             print(X.shape,Y.shape)
 

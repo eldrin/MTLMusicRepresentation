@@ -706,7 +706,7 @@ def build_autoencoder(layer, nonlinearity='same', b=init.Constant(0.)):
                 )
             autoencoder_layers.append(a_layer)
 
-    return autoencoder_layers[-1], encoder
+    return autoencoder_layers, encoder
 
 
 def unfold_bias_and_nonlinearity_layers(layer):

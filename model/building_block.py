@@ -4,6 +4,7 @@ from sklearn.externals import joblib
 
 import theano
 from lasagne import layers as L
+from lasagne.nonlinearities import tanh
 
 from custom_layer import STFTLayer, build_autoencoder
 from utils.misc import get_in_shape
@@ -161,8 +162,11 @@ def output_block(net, config, non_lin, verbose=True):
         out_layer_names.append('out.{}'.format(target))
 
         if target == 'self':
-            net[out_layer_names[-1]], net['fc'] = build_autoencoder(
-                net['fc'], nonlinearity='same')
+            layers, net['fc'] = build_autoencoder(
+                net['fc'], nonlinearity=tanh)
+
+            # STFT reconstruction (Z-scored)
+            net[out_layer_names[-1]] = layers[-5]
         else:
             net[out_layer_names[-1]] = L.DenseLayer(
                 net['fc'],

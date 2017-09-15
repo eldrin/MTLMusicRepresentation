@@ -1,4 +1,5 @@
 import os
+from collections import OrderedDict
 import numpy as np
 from sklearn.externals import joblib
 
@@ -13,6 +14,7 @@ from lasagne.regularization import regularize_layer_params, l2, l1
 from lasagne.updates import sgd,nesterov_momentum,adagrad,adam,rmsprop,adamax
 
 from utils.misc import *
+from building_block import input_block
 
 def get_train_funcs(net, config, feature_layer=None, **kwargs):
     """
@@ -33,15 +35,20 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         out_layer_name = 'out.{}'.format(target)
 
         layers = L.get_all_layers(net[out_layer_name])
-        Y = T.matrix('target')
 
         if target == 'self':
             loss = lasagne.objectives.squared_error
+
+            # put reconstruction after standard scaler
+            target_net = OrderedDict()
+            target_net, sigma_ = input_block(target_net, config)
+            Y = L.get_output(target_net['sclr'])
         else:
             if net[out_layer_name].nonlinearity == softmax:
                 loss = lasagne.objectives.categorical_crossentropy
             elif net[out_layer_name].nonlinearity == linear:
                 loss = lasagne.objectives.squared_error
+            Y = T.matrix('target')
 
         O = L.get_output(net[out_layer_name],deterministic=False)
         O_vl = L.get_output(net[out_layer_name],deterministic=True)
@@ -62,7 +69,11 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         updates = optimizer(cost,train_params,learning_rate=lr)
 
         # compile functions
-        cost_rel_inputs = [layers[0].input_var,Y]
+        if target == 'self':
+            cost_rel_inputs = [layers[0].input_var,
+                               target_net['input'].input_var]
+        else:
+            cost_rel_inputs = [layers[0].input_var,Y]
         functions[target] = {}
 
         functions[target]['train'] = theano.function(
