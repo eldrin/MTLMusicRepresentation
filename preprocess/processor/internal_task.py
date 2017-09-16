@@ -150,7 +150,7 @@ class MXMLyrics(MFTask):
             c = conn.cursor()
 
             triplet = c.execute(
-                'SELECT track_id, word, count FROM lyrics')
+                'SELECT track_id, word, count FROM lyrics').fetchall()
 
             tracks = c.execute('SELECT DISTINCT track_id FROM lyrics').fetchall()
             track_hash = OrderedDict([(v[0],k) for k, v in enumerate(tracks)])
