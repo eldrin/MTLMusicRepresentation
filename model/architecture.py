@@ -51,7 +51,7 @@ def build_2dconv_clf_deep(config, **kwargs):
     return net, sigma
 
 
-def build_2dconv_clf_small(config, size_multiplier=1, **kwargs):
+def build_2dconv_clf_small(config, **kwargs):
     """
     """
     # activation setting
@@ -60,7 +60,10 @@ def build_2dconv_clf_small(config, size_multiplier=1, **kwargs):
         config.hyper_parameters.activation)
     )
     non_lin = eval(config.hyper_parameters.activation)
-    m = size_multiplier
+    if hasattr(config.hyper_parameters, 'size_multiplier'):
+        m = config.hyper_parameters.size_multiplier
+    else:
+        m = 1
 
     # network dict
     net = OrderedDict()
