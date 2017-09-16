@@ -153,6 +153,11 @@ class MSD(IndexableDataset):
                 X = map(lambda x:x[0], data)
                 M = map(lambda x:x[1], data)
                 Y = map(lambda x:x[2], data)
+
+                # prepare sub batch
+                X, Y = prepare_sub_batches(
+                    self.sub_batch_sz, length_sp,
+                    X, M, Y)
             else:
                 # list of (2,sr*length)
                 data = filter(
@@ -163,11 +168,11 @@ class MSD(IndexableDataset):
                 M = map(lambda x:x[1], data)
                 Y = copy.deepcopy(X)
 
-            # prepare sub batch
-            X, _ = prepare_sub_batches(
-                self.sub_batch_sz, length_sp,
-                X, M)
-            Y = X.copy()
+                # prepare sub batch
+                X, _ = prepare_sub_batches(
+                    self.sub_batch_sz, length_sp,
+                    X, M)
+                Y = X.copy()
 
             print(X.shape,Y.shape)
 
