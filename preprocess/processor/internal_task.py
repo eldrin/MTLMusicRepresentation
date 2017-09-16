@@ -132,10 +132,16 @@ class LastFMTag(MFTask):
 
 class MXMLyrics(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, alg='plsa', tfidf=True):
         """"""
         super(MXMLyrics, self).__init__(n_components, db_fn, n_iter, alg)
         self.A, self.doc_hash, self.term_hash = self.read(db_fn)
+
+        # for lyrics, applying TF-IDF makes difference?
+        if tfidf:
+            from sklearn.feature_extraction.text import TfidfTransformer
+            self.tfidf = TfidfTransformer()
+            self.A = self.tfidf.fit_transform(self.A)
 
     @classmethod
     def read(cls, db_fn):

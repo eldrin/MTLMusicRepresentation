@@ -128,8 +128,9 @@ def output_block(net, config, non_lin, verbose=True):
     n_outs = config.hyper_parameters.n_out
 
     # Global Average Pooling
+    last_conv_block_name = next(reversed(net))
     net['gap'] = L.GlobalPoolLayer(
-        net[next(reversed(net))],
+        net[last_conv_block_name],
         name='gap'
     )
     net['gap.bn'] = L.BatchNormLayer(
@@ -164,8 +165,10 @@ def output_block(net, config, non_lin, verbose=True):
         if target == 'self':
             layers, net['fc'] = build_autoencoder(
                 net['fc'], nonlinearity=tanh)
+            # layers, net[last_conv_block_name] = build_autoencoder(
+            #     net[last_conv_block_name], nonlinearity=tanh)
 
-            # STFT reconstruction (Z-scored)
+            # STFT reconstruction
             net[out_layer_names[-1]] = layers[-5]
         else:
             net[out_layer_names[-1]] = L.DenseLayer(

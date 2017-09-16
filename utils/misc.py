@@ -413,5 +413,11 @@ def triplet2sparse(triplet, doc_hash=None, term_hash=None):
 
     return A
 
+def load_test_audio(config):
+    """"""
+    fn = config.paths.test_audio
+    sr = config.hyper_parameters.sample_rate
+    return librosa.load(fn,sr=sr)
+
 if __name__ == "__main__":
     test_signal_batching()

@@ -11,10 +11,30 @@ floatX = theano.config.floatX
 from lasagne import layers as L
 from lasagne.nonlinearities import rectify, tanh, softmax, elu, linear
 from lasagne.regularization import regularize_layer_params, l2, l1
-from lasagne.updates import sgd,nesterov_momentum,adagrad,adam,rmsprop,adamax
+from lasagne.updates import (sgd,
+                             nesterov_momentum,
+                             adagrad,
+                             adam,
+                             rmsprop,
+                             adadelta)
 
 from utils.misc import *
 from building_block import input_block
+
+def categorical_crossentropy_over_spectrum(pred, true):
+    # normalize in frequency side
+    true_n = true / (true.sum(axis=2)[:,:,None,:])
+    true_n = true_n.dimshuffle(0, 1, 3, 2)
+    true_n = true_n.reshape((true_n.shape[0] * true_n.shape[1] *
+                             true_n.shape[2], true_n.shape[-1]))
+
+    pred = pred.dimshuffle(0,1,3,2)
+    pred = pred.reshape((pred.shape[0] * pred.shape[1] *
+                         pred.shape[2], pred.shape[-1]))
+
+    pred = T.nnet.softmax(pred)
+
+    return T.nnet.nnet.categorical_crossentropy(pred, true_n)
 
 def get_train_funcs(net, config, feature_layer=None, **kwargs):
     """
@@ -37,6 +57,7 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
         layers = L.get_all_layers(net[out_layer_name])
 
         if target == 'self':
+            # loss = categorical_crossentropy_over_spectrum
             loss = lasagne.objectives.squared_error
 
             # put reconstruction after standard scaler

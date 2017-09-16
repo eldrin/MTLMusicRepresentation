@@ -97,6 +97,17 @@ def split_tag(A, tids_hash, train_ratio=0.9):
     return (Atr, Avl), (tids_train, tids_valid)
 
 # =====================================================================
+# functions for semantic analysis 
+# =====================================================================
+def get_topic_terms(V, terms, k=10):
+    """"""
+    top_k_terms = []
+    for v in V:
+        top_k_terms.append(
+            [terms[i] for i in np.argsort(v)[-k:][::-1]])
+    return top_k_terms
+
+# =====================================================================
 # functions for misc processes 
 # =====================================================================
 def filter_df_base_on_minfb(df, target, min_fb):

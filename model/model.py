@@ -36,7 +36,10 @@ class Model:
         self, config, feature_layer=None, *args, **kwargs):
         """"""
         self.config = config
-        self.corruption_rate = config.hyper_parameters.input_noise_scale
+        if hasattr(config.hyper_parameters, 'input_noise_scale'):
+            self.corruption_rate = config.hyper_parameters.input_noise_scale
+        else:
+            self.corruption_rate = 0.
 
         # load model builder
         exec('from architecture import build_{} as network_arch'.format(
