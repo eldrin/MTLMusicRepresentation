@@ -51,7 +51,7 @@ def build_2dconv_clf_deep(config, **kwargs):
     return net, sigma
 
 
-def build_2dconv_clf_small(config, **kwargs):
+def build_2dconv_clf_small(config, size_multiplier=1, **kwargs):
     """
     """
     # activation setting
@@ -60,32 +60,33 @@ def build_2dconv_clf_small(config, **kwargs):
         config.hyper_parameters.activation)
     )
     non_lin = eval(config.hyper_parameters.activation)
+    m = size_multiplier
 
     # network dict
     net = OrderedDict()
     net, sigma = input_block(net, config)
     net = conv_block(
-        net, n_convs=1, n_filters=16, filter_size=(5,5),
+        net, n_convs=1, n_filters=16 * m, filter_size=(5,5),
         stride=(2,2), pool_size=(2,2), nonlinearity=non_lin,
         batch_norm=True, name='conv1', verbose=True
     )
     net = conv_block(
-        net, n_convs=1, n_filters=32, filter_size=(3,3),
+        net, n_convs=1, n_filters=32 * m, filter_size=(3,3),
         stride=(1,1), pool_size=(2,2), nonlinearity=non_lin,
         batch_norm=True, name='conv2', verbose=True
     )
     net = conv_block(
-        net, n_convs=2, n_filters=64, filter_size=(3,3),
+        net, n_convs=2, n_filters=64 * m, filter_size=(3,3),
         stride=(1,1), pool_size=(2,2), nonlinearity=non_lin,
         batch_norm=True, name='conv3', verbose=True
     )
     net = conv_block(
-        net, n_convs=2, n_filters=128, filter_size=(3,3),
+        net, n_convs=2, n_filters=128 * m, filter_size=(3,3),
         stride=(1,1), pool_size=(2,2), nonlinearity=non_lin,
         batch_norm=True, name='conv4', verbose=True
     )
     net = conv_block(
-        net, n_convs=3, n_filters=256, filter_size=[(3,3),(3,3),(1,1)],
+        net, n_convs=3, n_filters=256 * m, filter_size=[(3,3),(3,3),(1,1)],
         stride=(1,1), pool_size=(2,2), nonlinearity=non_lin,
         batch_norm=True, name='conv5', verbose=True
     )
