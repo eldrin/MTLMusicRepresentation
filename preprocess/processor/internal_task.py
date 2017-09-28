@@ -1,12 +1,15 @@
 from abc import ABCMeta, abstractmethod
 import sqlite3
 from collections import OrderedDict, Iterable
+from itertools import chain
+import cPickle as pkl
 
 import numpy as np
 from scipy import sparse as sp
+import pandas as pd
 
 from sklearn.externals import joblib
-from sklearn.mixture import GaussianMixture
+from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 
 from factorization import MatrixFactorization
 from utils.misc import triplet2sparse
@@ -163,6 +166,47 @@ class MXMLyrics(MFTask):
         return A.tocsr(), track_hash, word_hash
 
 
+class CDRGenre(MFTask):
+    """"""
+    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+        """"""
+        super(CDRGenre, self).__init__(n_components, db_fn, n_iter, alg)
+        self.A, self.doc_hash, self.term_hash = self.read(db_fn)
+
+    @classmethod
+    def read(cls, db_fn):
+        """"""
+        # (tid, path, genres)
+        data = pkl.load(open(db_fn))
+
+        triplet = []
+        for d in data:
+            for r in d[2]:
+                triplet.append((d[0], r, 1))
+
+        # triplet = map(lambda x: map(lambda y: (x[0], y, 1), x[2]), data)
+        tracks = list(set(map(lambda x:x[0], triplet)))
+        track_hash = OrderedDict([(v, k) for k, v in enumerate(tracks)])
+        genres = list(set(map(lambda x:x[1], triplet)))
+        genre_hash = OrderedDict([(v, k) for k, v in enumerate(genres)])
+
+        # (n_items, n_genres)
+        A = triplet2sparse(triplet, track_hash, genre_hash)
+
+        return A.tocsr(), track_hash, genre_hash
+
+    @property
+    def data(self):
+        """ Include original doc_term for full clf test """
+        return {
+            'item_factors': self.U,
+            'term_factors': self.V,
+            'tids': self.doc_hash.keys(),
+            'uids': self.term_hash.keys(),
+            'item_term': self.A
+        }
+
+
 class MSDArtist(MFTask):
     """"""
     def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
@@ -222,15 +266,35 @@ class MSDArtist(MFTask):
             'artists':self.artists
         }
 
-
-class MSDTempo(BaseInternalTask):
+class GMMTask(BaseInternalTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, alg='em'):
         """"""
-        super(MSDTempo, self).__init__(n_components, db_fn, n_iter, alg)
+        super(GMMTask, self).__init__(n_components, db_fn, n_iter, alg)
         self.A, self.doc_hash = self.read(db_fn)
-        self.gmm = GaussianMixture(self.k, max_iter=n_iter)
+        if alg=='em':
+            self.gmm = GaussianMixture(self.k, max_iter=n_iter)
+        elif alg=='variational':
+            self.gmm = BayesianGaussianMixture(self.k, max_iter=n_iter)
 
+    def process(self):
+        """"""
+        self.gmm.fit(self.A)
+        self.U = self.gmm.predict_proba(self.A)
+
+    @property
+    def data(self):
+        """"""
+        return {
+            'item_factors': self.U,
+            'term_factors': self.V,
+            'tids': self.doc_hash.keys(),
+            'uids': self.term_hash.keys(),
+            'factor_labels':self.gmm.means_
+        }
+
+class MSDTempo(GMMTask):
+    """"""
     @classmethod
     def read(cls, db_fn):
         """"""
@@ -240,8 +304,23 @@ class MSDTempo(BaseInternalTask):
         tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
         return A, tids_hash
 
-    def process(self):
+class MSDYear(GMMTask):
+    """"""
+    @classmethod
+    def read(cls, db_fn):
         """"""
-        self.gmm.fit(self.A)
-        self.U = self.gmm.predict_proba(self.A)
+        data = pd.read_csv(db_fn, delimiter='<SEP>', engine='python',
+                           header=None, index_col=0, parse_dates=True,
+                           infer_datetime_format=True)
+        A = data.index.year.astype(np.float32)[:,None]
+        tids = data[1].as_matrix()
+        tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
+        return A, tids_hash
+
+class KeyScale(BaseInternalTask):
+    """"""
+    def __init__(self, db_fn, n_iter):
+        """"""
+        super(KeyScale, self).__init__(24, db_fn, n_iter, 'plsa')
+        # load pre-computed key-scale information (?)
 

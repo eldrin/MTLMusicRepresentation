@@ -15,11 +15,20 @@ from lasagne.updates import (sgd,
                              nesterov_momentum,
                              adagrad,
                              adam,
+                             adamax,
                              rmsprop,
                              adadelta)
 
 from utils.misc import *
 from building_block import input_block
+from ops import mu_law_encode, mu_law_decode
+
+def categorical_crossentropy_over_signal(pred, true):
+    """ Might be better than l2 norm on signal,
+    but extremely memory expensive
+    """
+    true = mu_law_encode(true)
+    return T.nnet.categorical_crossentropy(pred, true)
 
 def categorical_crossentropy_over_spectrum(pred, true):
     # normalize in frequency side
@@ -36,7 +45,13 @@ def categorical_crossentropy_over_spectrum(pred, true):
 
     return T.nnet.nnet.categorical_crossentropy(pred, true_n)
 
-def get_train_funcs(net, config, feature_layer=None, **kwargs):
+def binary_crossentropy_over_spectrum(pred, true):
+    # normalize in frequency side
+    true_n = true / (true.sum(axis=2)[:,:,None,:] + 0.000001)
+    pred = T.nnet.sigmoid(pred)
+    return T.nnet.nnet.binary_crossentropy(pred, true_n)
+
+def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
     """
     """
     # optimizer setting
@@ -45,7 +60,7 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
     beta = config.hyper_parameters.l2
 
     if feature_layer is None:
-        feature_layer = 'fc.bn.do'
+        feature_layer = 'fc'
 
     # function containor
     functions = {}
@@ -56,26 +71,38 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
 
         layers = L.get_all_layers(net[out_layer_name])
 
-        if target == 'self':
-            # loss = categorical_crossentropy_over_spectrum
-            loss = lasagne.objectives.squared_error
-
-            # put reconstruction after standard scaler
-            target_net = OrderedDict()
-            target_net, sigma_ = input_block(target_net, config)
-            Y = L.get_output(target_net['sclr'])
-        else:
-            if net[out_layer_name].nonlinearity == softmax:
-                loss = lasagne.objectives.categorical_crossentropy
-            elif net[out_layer_name].nonlinearity == linear:
-                loss = lasagne.objectives.squared_error
-            Y = T.matrix('target')
-
         O = L.get_output(net[out_layer_name],deterministic=False)
         O_vl = L.get_output(net[out_layer_name],deterministic=True)
 
         train_params = L.get_all_params(net[out_layer_name],trainable=True)
         non_train_params = L.get_all_params(net[out_layer_name],trainable=False)
+
+        if target=='self':
+            train_params.extend(
+                L.get_all_params(net[feature_layer], trainable=True))
+
+        # if target == 'self':
+        #     # loss = binary_crossentropy_over_spectrum
+        #     # loss = categorical_crossentropy_over_spectrum
+        #     loss = lasagne.objectives.squared_error
+
+        #     # put reconstruction after standard scaler
+        #     target_net = OrderedDict()
+        #     target_net, sigma_ = input_block(target_net, config)
+        #     Y = L.get_output(target_net['sclr'], deterministic=True)
+        #     # Y = T.tensor3('target')
+        # else:
+        #     if net[out_layer_name].nonlinearity == softmax:
+        #         loss = lasagne.objectives.categorical_crossentropy
+        #     elif net[out_layer_name].nonlinearity == linear:
+        #         loss = lasagne.objectives.squared_error
+        #     Y = T.matrix('target')
+
+        if net[out_layer_name].nonlinearity == softmax:
+            loss = lasagne.objectives.categorical_crossentropy
+        elif net[out_layer_name].nonlinearity == linear:
+            loss = lasagne.objectives.squared_error
+        Y = T.matrix('target')
 
         error = loss(O,Y).mean()
         error_vl = loss(O_vl,Y).mean()
@@ -91,10 +118,25 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
 
         # compile functions
         if target == 'self':
-            cost_rel_inputs = [layers[0].input_var,
-                               target_net['input'].input_var]
+            # cost_rel_inputs = [layers[0].input_var,
+            #                    target_net['input'].input_var]
+            if input_vars is not None:
+                cost_rel_inputs = list(input_vars)
+                cost_rel_inputs.append(Y)
+                input_var_feat = [cost_rel_inputs[0]]
+                input_var_pred = input_vars
+            else:
+                raise ValueError(
+                    '[ERROR] In "self" case, you need to pass input vars')
         else:
-            cost_rel_inputs = [layers[0].input_var,Y]
+            if input_vars is not None:
+                cost_rel_inputs = list(input_vars)
+                cost_rel_inputs.append(Y)
+            else:
+                cost_rel_inputs = [layers[0].input_var,Y]
+            input_var_feat = [layers[0].input_var]
+            input_var_pred = input_var_feat
+
         functions[target] = {}
 
         functions[target]['train'] = theano.function(
@@ -108,16 +150,17 @@ def get_train_funcs(net, config, feature_layer=None, **kwargs):
             allow_input_downcast=True
         )
         functions[target]['predict'] = theano.function(
-            inputs = [layers[0].input_var],
+            inputs = input_var_pred,
             outputs = O_vl,
             allow_input_downcast = True
         )
 
     # feature is class independent
     feature = L.get_output(get_layer(net, feature_layer),
+                           inputs=input_var_feat[0],
                            deterministic=True)
     functions['feature'] = theano.function(
-        inputs = [layers[0].input_var],
+        inputs = input_var_feat,
         outputs = feature,
         allow_input_downcast = True
     )
@@ -241,7 +284,8 @@ def load_check_point(network, config):
             with np.load(fns['param']) as f:
                 param_values = [f['arr_%d' % i] for i in range(len(f.files))]
 
-            lasagne.layers.set_all_param_values(network['IO'], param_values)
+            lasagne.layers.set_all_param_values(network.values(),
+                                                param_values)
             it = joblib.load(fns['state'])['iter']
         except Exception as e:
             print(e)
@@ -258,7 +302,8 @@ def save_check_point(it, network, config):
     fns = get_check_point_fns(config)
     config_dict = namedtupled.reduce(config)
 
-    np.savez(fns['param'], *lasagne.layers.get_all_param_values(network['IO']))
+    np.savez(fns['param'],
+             *lasagne.layers.get_all_param_values(network.values()))
     joblib.dump({'iter':it, 'config':config_dict}, fns['state'])
 
 
@@ -282,7 +327,6 @@ def get_check_point_fns(config):
         raise e # TODO: elaborate this
 
     return fns
-
 
 if __name__ == "__main__":
     test_model_building()

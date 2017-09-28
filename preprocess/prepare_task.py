@@ -17,7 +17,11 @@ TASK_PROCESS = {
                'process': MXMLyrics},
     'artist': {'db_fn': {'artist':'/mnt/msd/user_song_preference.db',
                          'tag':'/mnt/msd/lastfm_tags.db'},
-               'process': MSDArtist}
+               'process': MSDArtist},
+    'year': {'db_fn':'/mnt/msd/tracks_per_year.txt',
+             'process':MSDYear},
+    'cdr_tag': {'db_fn': '/mnt/msd/meta_data/CDR_genre.pkl',
+                'process': CDRGenre},
 }
 
 

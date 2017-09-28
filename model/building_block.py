@@ -4,16 +4,28 @@ from sklearn.externals import joblib
 
 import theano
 from lasagne import layers as L
-from lasagne.nonlinearities import tanh
+from lasagne.nonlinearities import tanh, elu
 
-from custom_layer import STFTLayer, build_autoencoder
+from custom_layer import STFTLayer, build_autoencoder, build_siamese
 from utils.misc import get_in_shape
 
 def conv_block(
     net, n_convs, n_filters, filter_size,
     stride, pool_size, nonlinearity, batch_norm, name,
-    verbose=False, *args, **kwargs):
+    is_feature=False, verbose=False, *args, **kwargs):
     """"""
+    # check nonlin
+    if isinstance(nonlinearity, (tuple, list)):
+        if len(nonlinearity) != n_convs:
+            raise ValueError(
+                '[ERROR] if nonlinearity passed as Iterable of nonlins, \
+                the length should be same as n_convs')
+    else:
+        nonlinearity = [nonlinearity] * n_convs
+
+    # check stride
+    if stride is None:
+        stride = (1,1)
 
     # check filter_size
     if isinstance(filter_size, list):
@@ -45,7 +57,7 @@ def conv_block(
         layer_name += '.nonlin'
         net[layer_name] = L.NonlinearityLayer(
             net[next(reversed(net))],
-            nonlinearity=nonlinearity
+            nonlinearity=nonlinearity[n]
         )
 
     if pool_size != None:
@@ -163,13 +175,29 @@ def output_block(net, config, non_lin, verbose=True):
         out_layer_names.append('out.{}'.format(target))
 
         if target == 'self':
+            """
             layers, net['fc'] = build_autoencoder(
-                net['fc'], nonlinearity=tanh)
-            # layers, net[last_conv_block_name] = build_autoencoder(
-            #     net[last_conv_block_name], nonlinearity=tanh)
+                net['fc'], nonlinearity=tanh, learnable_conv=False)
 
-            # STFT reconstruction
-            net[out_layer_names[-1]] = layers[-5]
+            # # STFT (sclr) reconstruction
+            # net[out_layer_names[-1]] = layers[-5]
+
+            # STFT (sclr) after couple of  trainable 2DConvs
+            layer = L.Conv2DLayer(
+                layers[-5], num_filters=32, pad='same', filter_size=(3, 3),
+                nonlinearity=tanh, name='AEout1')
+            layer = L.Conv2DLayer(
+                layer, num_filters=32, pad='same', filter_size=(3, 3),
+                nonlinearity=tanh, name='AEout2')
+
+            net[out_layer_names[-1]] = L.Conv2DLayer(
+                layer, num_filters=2, pad='same', filter_size=(3, 3),
+                nonlinearity=None, name='AEout_out')
+
+            # # Signal reconstruction
+            # net[out_layer_names[-1]] = layers[-1]
+            """
+            net[out_layer_names[-1]], inputs = build_siamese(net['fc'])
         else:
             net[out_layer_names[-1]] = L.DenseLayer(
                 net['fc'],
@@ -177,6 +205,7 @@ def output_block(net, config, non_lin, verbose=True):
                 nonlinearity=out_act,
                 name=out_layer_names[-1]
             )
+            inputs = [net['input'].input_var]
 
     # make a concatation layer just for save/load purpose
     net['IO'] = L.ConcatLayer(
@@ -192,5 +221,5 @@ def output_block(net, config, non_lin, verbose=True):
         for target in targets:
             print(net['out.{}'.format(target)].output_shape)
 
-    return net
+    return net, inputs
 

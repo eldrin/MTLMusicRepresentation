@@ -41,8 +41,8 @@ class Trainer:
                 for _ in xrange(self.n_iter):
 
                     # save check point
-                    if (self.model.iter % self.check_point_intv == 0) and \
-                       (self.model.iter > 0):
+                    if self.model.iter % self.check_point_intv == 0 and \
+                       self.model.iter > 0:
                         self.model.save()
 
                     # SELECT TASK

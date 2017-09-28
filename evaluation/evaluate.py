@@ -1,196 +1,148 @@
+#!/usr/bin/python
 import os
 import time
-import cPickle as pkl
+import json
+from itertools import combinations
 
-import numpy as np
+import pandas as pd
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, FunctionTransformer
-from sklearn.model_selection import cross_val_predict
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report, accuracy_score
-from sklearn.externals import joblib
-
-import namedtupled
-import librosa
-import h5py
-
-from model.model import Model
-from utils.misc import get_in_shape
+from evaluator.external import ExternalTaskEvaluator
+from helper import print_cm
 
 import fire
 
-class ExternalTaskEvaluator:
+class Evaluate(object):
     """"""
-    def __init__(self, fns, standardize=False, n_jobs=-1):
+    def __init__(self, out_dir=None, comb_lim=2, preproc=None,
+                 n_jobs=-1, keep_metrics=['accuracy']):
         """"""
-        self.data = []
-        for fn in fns:
-            self.data.append(h5py.File(fn,'r'))
-        if not eval('=='.join(
-            ['"{}"'.format(hf.attrs['dataset']) for hf in self.data])):
-            raise ValueError('[ERROR] All dataset should be same!')
+        if out_dir is None:
+            out_dir = os.getcwd()
 
-        # initiate evaluation model
-        # self.model = LogisticRegression(n_jobs=n_jobs)
-        self.model = LogisticRegression(
-            solver='saga', max_iter=100, n_jobs=n_jobs,
-            # multi_class='multinomial'
-            multi_class='ovr'
-        )
+        self.out_dir = out_dir
+        self.preproc = preproc
+        self.comb_lim = comb_lim
+        self.n_jobs = -1
+        self.keep_metrics = keep_metrics
 
-        # initiate pre-processor
-        self.standardize = standardize
-        if standardize:
-            self.preproc = StandardScaler()
+    def internal(self, path):
+        """"""
+        pass
+
+    def external(self, path):
+        """"""
+        # parsing path
+        # path can be configuration file, file path, or directory
+        # config version and filepath version will be developped first
+        if os.path.isdir(path):
+            # evaluation all files in dir
+            raise NotImplementedError(
+                '[ERROR] directory input is not yet supported!')
         else:
-            self.preproc = FunctionTransformer(lambda x:x)
+            if os.path.splitext(path)[-1] == '.json':
 
-        # setup pipeline
-        self.pipeline = Pipeline(
-            steps=[('sclr', self.preproc), ('classifier', self.model)])
+                # config file case
+                keep_res = {}
+                config = json.load(open(path))
+                for task, paths in config.iteritems():
+                    if task == 'root':
+                        continue
+                    else:
+                        keep_res[task] = {}
+                        avail_feats = filter(
+                            lambda x:x[1] is not None, paths.items())
 
-    def evaluate(self):
+                        for r in xrange(1, self.comb_lim+1):
+                            for comb in combinations(avail_feats, r):
+
+                                # make each combination's file name id
+                                comb_key = '-'.join(map(lambda x:x[0], comb))
+                                out_fn = comb_key + '-{}.txt'.format(task)
+
+                                # and file path list
+                                fns = map(
+                                    lambda x:
+                                    os.path.join(config['root'], x[1]),
+                                    comb
+                                )
+                                # instantiate evaluator and evaluate
+                                evaluator = ExternalTaskEvaluator(
+                                    fns, self.preproc, self.n_jobs)
+                                res = evaluator.evaluate()
+
+                                for metric in self.keep_metrics:
+                                    keep_res[task][comb_key] = \
+                                    {metric:res[metric]}
+
+                                # save & print
+                                self._save(out_fn, self._print(res))
+
+                # save summary in json
+                json.dump(keep_res,
+                          open(os.path.join(
+                              self.out_dir, 'summary.json'), 'w'))
+
+                # save summary in individual csv for metrics
+                for metric in self.keep_metrics:
+                    score = {}
+                    for task, scores in keep_res.iteritems():
+                        score[task] = {}
+                        for int_task, int_scores in scores.iteritems():
+                            score[task][int_task] = int_scores[metric]
+
+                    pd.DataFrame(score).to_csv(
+                        os.path.join(
+                            self.out_dir,
+                            'summary.{}.csv'.format(metric)))
+
+            elif os.path.splitext(path)[-1] == '.h5': # feature files case
+
+                # prepare path
+                path = path.split('-')
+                out_fn = '-'.join(
+                    [os.path.splitext(os.path.basename(fn))[0] for fn in path])
+                out_fn += '{}.txt'
+
+                # instantiate evaluator & evaluate
+                evaluator = ExternalTaskEvaluator(
+                    path, self.preproc, self.n_jobs)
+                res = evaluator.evaluate()
+
+                # save & print
+                self._save(out_fn, self._print(res))
+
+            else:
+                raise ValueError(
+                    '[ERROR] only confing (json) and feature (h5) files are\
+                    supported!')
+
+    def _save(self, fn, lines):
         """"""
-        # concatenate features
-        X = np.concatenate(
-            [data['X'][:] for data in self.data], axis=1)
-
-        y_true = self.data[0]['y'][:]
-        labels = self.data[0]['labels'][:]
-
-        X, y_true = self._check_n_fix_data(X, y_true, True)
-
-        t = time.time()
-        y_pred = cross_val_predict(self.pipeline, X, y_true, cv=10).astype(int)
-        cv_time = time.time() - t
-        cr = classification_report(y_true, y_pred, target_names=labels)
-        ac = accuracy_score(y_true, y_pred)
-
-        return {'classification_report':cr, 'accuracy':ac, 'time':cv_time}
-
-    @staticmethod
-    def _check_n_fix_data(X, y, report=False):
-        """"""
-        # check nan
-        nan_samples = np.where(np.isnan(X).sum(axis=1)>0)[0]
-        normal_samples = np.where(np.isnan(X).sum(axis=1)==0)[0]
-
-        if report:
-            print('Total {:d} NaN samples found'.format(len(nan_samples)))
-
-        return X[normal_samples], y[normal_samples]
-
-def external_eval(in_fns, out_fn, standardize=False, n_jobs=-1):
-    """
-    in_fns : string (separable with separator '-')
-    out_fn : string
-    """
-    in_fns = in_fns.split('-')
-    evaluator = ExternalTaskEvaluator(in_fns, standardize, n_jobs)
-    res = evaluator.evaluate()
-
-    lines = '=================  Classification Report =================='
-    lines += '\n'
-    lines += res['classification_report']
-    lines += '\n'
-    lines += 'Overall Accuracy: {:.2%}'.format(res['accuracy'])
-    lines += '\n'
-    lines += 'Time spent: {:.2f} (sec)'.format(res['time'])
-
-    print
-    print(lines)
-
-    # save lines
-    if out_fn is not None:
-        with open(out_fn, 'w') as f:
+        path = os.path.join(self.out_dir, fn)
+        with open(path, 'w') as f:
             f.write(lines)
 
-# Evaluator for all internal tasks
-class InternalTaskEvaluator:
-    """"""
-    def __init__(self, fn):
+    @staticmethod
+    def _print(res):
         """"""
-        # load configuration for model
-        model_state = joblib.load(fn)
-        self.config = namedtupled.map(model_state['config'])
+        lines = ''
+        if res['classification_report'] is not None:
+            lines += '=================  Classification Report =================='
+            lines += '\n'
+            lines += res['classification_report']
+            lines += '\n'
+            lines += '====================  Confusion Matrix ===================='
+            lines += print_cm(*res['confusion_matrix'])
+            lines += '\n'
+            lines += 'Overall Accuracy: {:.2%}'.format(res['accuracy'])
+        else:
+            lines += 'R2 Score: {:.2f}'.format(res['accuracy'])
 
-        # variable set up
-        self.tasks = self.config.task
-        self.sr = self.config.hyper_parameters.sample_rate
-        self.hop_sz = hop_sz # in second
-        self.in_shape = get_in_shape(self.config)
-
-        # load valid id for each task
-        split = namedtupled.reduce(self.config.paths.meta_data.splits)
-        self.valid_ids = {
-            k:joblib.load(v)['valid']
-            for k,v in split.iteritems()
-        }
-        self.path_map = pkl.load(open(self.config.paths.path_map))
-
-        # load model builder
-        self.model = Model(config, feature_layer)
-
-
-# Task specific evaluation helpers
-def evaluate_tag(song_ids, model, path_map, config, top_k=20):
-    """"""
-    # variable set up
-    tasks = self.config.task
-    sr = self.config.hyper_parameters.sample_rate
-    hop_sz = hop_sz # in second
-    in_shape = get_in_shape(self.config)
-
-    # load tag factor
-    tag_factor_model = joblib.load(
-        os.path.join(
-            config.paths.meta_data.root,
-            config.paths.meta_data.targets.tag
-        )
-    )
-
-    V = tag_factor_model['tag_factors']
-    U = tag_factor_model['item_factors']
-    tids_hash = {
-        tid:j for j,tid in enumerate(tag_factor_model['tids'])
-    }
-
-    # inference song level
-    for song_id in song_ids:
-        y = U[tids_hash[song_id]]
-        o, c, f = _get_feature_and_prob(
-            path_map[song_id], y, model, hop_sz, in_shape[-1])
-
-        pred = o.dot(V)
-        pred_tag_ix = np.argsort(pred)[-top_k:][::-1]
-        # true_tag_ix = something
-        # TODO: finish this up
-
-
-def _get_feature_and_prob(song_fn, Y, model, hop_sz, sr, dur_sp):
-    """"""
-    y, sr = librosa.load(song_fn, sr=sr)
-
-    if y.ndim==1:
-        y = np.repeat(y[None,:], 2, axis=0)
-
-    X = []
-    for start in xrange(0, len(y), hop_sz * sr):
-        slc = slice(start, start + dur_sp)
-        x = y[:,slc][None,:,:]
-        if x.shape[-1] < dur_sp:
-            continue
-        X.append(x)
-    X = np.array(X)
-    Y = np.repeat(Y[None,:], X.shape[0], axis=0)
-
-    O = model.predict('tag', X).mean(axis=0)
-    C = model.cost('tag', X, Y).mean(axis=0)
-    F_raw = model.feature(X)
-    F = np.concatenate([F_raw.mean(axis=0), F_raw.std(axis=0)])
-
-    return O, C, F
+        lines += '\n'
+        lines += 'Time spent: {:.2f} (sec)'.format(res['time'])
+        print
+        print(lines)
+        return lines
 
 if __name__ == "__main__":
-    fire.Fire(external_eval)
+    fire.Fire(Evaluate)

@@ -7,6 +7,7 @@ from theano.tensor.nnet.abstract_conv import (AbstractConv3d,
 from theano import config
 
 import lasagne
+from lasagne import layers as L
 from lasagne.layers import get_all_layers
 from lasagne.layers import MergeLayer, Layer, InputLayer, InverseLayer
 from lasagne.layers import NonlinearityLayer, BiasLayer
@@ -592,7 +593,8 @@ class TransposedConv3DLayer(BaseConvLayer):
 
 
 # THERE CODES FROM neosatrapahereje's GITHUB
-def build_autoencoder(layer, nonlinearity='same', b=init.Constant(0.)):
+def build_autoencoder(layer, nonlinearity='same', b=init.Constant(0.),
+                      learnable_conv=False):
     """
     Unfolds a stack of layers into a symmetric autoencoder with tied weights.
     Given a :class:`Layer` instance, this function builds a
@@ -689,6 +691,13 @@ def build_autoencoder(layer, nonlinearity='same', b=init.Constant(0.)):
                 sigma=layer.sigma
             )
             autoencoder_layers.append(a_layer)
+        elif isinstance(layer, L.Conv2DLayer) and learnable_conv:
+            a_layer = L.TransposedConv2DLayer(
+                incoming=incoming, num_filters=layer.input_shape[1],
+                filter_size=layer.filter_size, stride=layer.stride,
+                crop=layer.pad, untie_biases=layer.untie_biases, b=None,
+                nonlinearity=None)
+            # a_layer = NonlinearityLayer(incoming=a_layer, **kwargs_n)
         else:
             a_layer = InverseLayer(
                 incoming=incoming,
@@ -782,3 +791,31 @@ def unfold_bias_and_nonlinearity_layers(layer):
             )
         incoming = layer
     return layer
+
+def build_siamese(layer):
+    """"""
+    smx = nonlinearities.softmax
+    lnr = nonlinearities.linear
+    layers = L.get_all_layers(layer)
+    nl = filter(
+        lambda l:
+        hasattr(l, 'nonlinearity') and
+        ((l.nonlinearity != smx) and (l.nonlinearity != lnr)),
+        layers)[0].nonlinearity
+    print(nl)
+
+    Xl = T.tensor3('left')
+    Xr = T.tensor3('right')
+
+    Ol = L.get_output(layer, inputs=Xl)
+    # Ol_vl = L.get_output(layer, inputs=Xl, deterministic=True)
+    Or = L.get_output(layer, inputs=Xr)
+    O = T.concatenate([Ol, Or], axis=-1)
+
+    layer = L.InputLayer((None, layer.output_shape[-1] * 2), input_var=O)
+    layer = L.DenseLayer(layer, 128, nonlinearity=None, name='hc1')
+    layer = L.BatchNormLayer(layer)
+    layer = L.NonlinearityLayer(layer, nonlinearity=nl)
+    layer = L.DenseLayer(layer, 2, nonlinearity=smx)
+
+    return layer, (Xl, Xr)

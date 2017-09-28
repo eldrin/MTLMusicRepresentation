@@ -78,8 +78,9 @@ def load_config(fn):
 
 def get_layer(net, layer_name):
     """"""
-    layers = L.get_all_layers(net['IO'])
-    return filter(lambda x:x.name == layer_name, layers)[0]
+    # layers = L.get_all_layers(net['IO'])
+    # return filter(lambda x:x.name == layer_name, layers)[0]
+    return net[layer_name]
 
 
 def get_in_shape(config):
@@ -157,7 +158,7 @@ def load_audio(fn, sr=None):
 
             # resampling for outliers
             if (sr is not None) and (int(sr_file) != int(sr)):
-                print('resample!')
+                # print('resample!')
                 y = librosa.resample(
                     y, sr_file, sr,
                     res_type='kaiser_fast'
@@ -272,7 +273,10 @@ def prepare_sub_batches(n, dur, signal, mask, target=None):
         target_dim = 1
         target = -np.ones((batch_sz, target_dim)) # dummy values
     else:
-        target_dim = target[0].shape[-1]
+        if isinstance(target[0], int):
+            target_dim = 1
+        else:
+            target_dim = target[0].shape[-1]
 
     X = np.zeros(((n * batch_sz), n_ch, dur))
     Y = np.zeros(((n * batch_sz), target_dim))
