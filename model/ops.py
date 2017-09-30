@@ -9,6 +9,7 @@ import librosa
 
 import scipy
 
+# function is from Kapre
 def _get_stft_kernels(n_dft, window=scipy.signal.hann, keras_ver='new'):
     '''Return dft kernels for real/imagnary parts assuming
         the input signal is real.
@@ -71,7 +72,7 @@ def fft_op(input,n_fft,stride,win=scipy.signal.hann,log_amp=True):
     """
     """
     dft_kernel_r, dft_kernel_i = _get_stft_kernels(n_fft,win,'old')
-    
+
     X_real = T.nnet.conv2d(input,dft_kernel_r,subsample=stride)
     X_imag = T.nnet.conv2d(input,dft_kernel_i,subsample=stride)
 

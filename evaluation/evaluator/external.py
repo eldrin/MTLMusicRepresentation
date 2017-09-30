@@ -14,6 +14,7 @@ from sklearn.metrics import (classification_report,
                              r2_score,
                              confusion_matrix)
 
+from model.recsys.model import ContentExplicitALS
 import h5py
 
 class ExternalTaskEvaluator:
@@ -27,30 +28,30 @@ class ExternalTaskEvaluator:
             ['"{}"'.format(hf.attrs['dataset']) for hf in self.data])):
             raise ValueError('[ERROR] All dataset should be same!')
 
-        # initiate evaluation model
-        if self.data[0].attrs['type'] == 'classification':
-            # self.model = LogisticRegression(
-            #     solver='saga', max_iter=100, n_jobs=n_jobs,
-            #     multi_class='multinomial'
-            #     # multi_class='ovr'
-            # )
-            self.model = SVC(kernel='linear')
-        elif self.data[0].attrs['type'] == 'regression':
-            # self.model = LinearRegression(n_jobs=n_jobs)
-            self.model = SVR()
+        task_type = self.data[0].attrs['type']
+        if task_type != 'recommendataion':
 
-        # initiate pre-processor
-        if preproc is not None:
-            if preproc == 'standardize':
-                self.preproc = StandardScaler()
-            elif preproc == 'pca_whiten':
-                self.preproc = PCA(n_components=256, whiten=True)
+            # initiate evaluation model
+            if task_type == 'classification':
+                self.model = SVC(kernel='linear')
+            elif task_type == 'regression':
+                self.model = SVR()
+
+            # initiate pre-processor
+            if preproc is not None:
+                if preproc == 'standardize':
+                    self.preproc = StandardScaler()
+                elif preproc == 'pca_whiten':
+                    self.preproc = PCA(n_components=256, whiten=True)
+            else:
+                self.preproc = FunctionTransformer(lambda x:x)
+
+            # setup pipeline
+            self.pipeline = Pipeline(
+                steps=[('sclr', self.preproc), ('model', self.model)])
+
         else:
-            self.preproc = FunctionTransformer(lambda x:x)
-
-        # setup pipeline
-        self.pipeline = Pipeline(
-            steps=[('sclr', self.preproc), ('classifier', self.model)])
+            self.model = ContentExplicitALS(n_components=20)
 
     def evaluate(self):
         """"""
