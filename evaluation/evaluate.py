@@ -143,14 +143,18 @@ class Evaluate(object):
             lines += print_cm(*res['confusion_matrix'])
             lines += '\n'
 
-        score_key = filter(lambda k: 'score' in k, res.keys())[0]
-        score_name = score_key.split('_score')[0]
-        if score_name == 'accuracy':
-            lines += '{}: {:.2%}'.format(score_name.title(), res[score_key])
-        else:
-            lines += '{}: {:.4f}'.format(score_name.title(), res[score_key])
+        score_key = filter(lambda k: 'score' in k, res.keys())
 
-        lines += '\n'
+        for score in score_key:
+            score_name = score.split('_score')[0]
+            if score_name == 'accuracy':
+                lines += '{}: {:.2%}'.format(score_name.title(),
+                                             res[score])
+            else:
+                lines += '{}: {:.4f}'.format(score_name.title(),
+                                             res[score])
+            lines += '\n'
+
         lines += 'Time spent: {:.2f} (sec)'.format(res['time'])
         print
         print(lines)

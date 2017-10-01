@@ -17,7 +17,7 @@ from sklearn.metrics import (classification_report,
                              r2_score,
                              confusion_matrix)
 
-from model.recsys.model import ContentExplicitALS
+from model.recsys.model import ContentExplicitALS, ContentImplicitALS
 import h5py
 
 class BaseExternalTaskEvaluator(object):
@@ -123,57 +123,31 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=40, eval_type='outer'):
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=80, cv=5,
+                 eval_type='outer', n_factors=40, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 
         self.eval_type = eval_type
+        self.cv = cv
         self.k = k
 
         if self.task_type == 'recommendation':
-            self.model = ContentExplicitALS(n_factors=20)
+            self.model = ContentExplicitALS(n_factors=n_factors,
+                                            max_iter=max_iter, verbose=True)
+            # self.model = ContentImplicitALS(n_factors=n_factors,
+            #                                 max_iter=max_iter,
+            #                                 lam_u=10, lam_v=100, lam_w=10,
+            #                                 verbose=True)
         else:
             raise ValueError(
                 '[ERROR] RecSysEvaluator only suports recommendation!')
 
     @staticmethod
-    def _make_cv(R, n_cv=5, typ='outer'):
+    def prec_recall_at_k(model, k, R_test, X_test=None, verbose=False):
         """"""
-        R = R.T
-        Rs = []
-        split_cv = []
-        kf = KFold(n_splits=n_cv, shuffle=True)
-
-        if typ == 'outer':
-            for trn_id, val_id in kf.split(range(R.shape[1])):
-                splits = _split_outer(R, trn_id, val_id)
-                split_cv.append(splits)
-                Rs.append(
-                    (R[:, splits['train']['track']][splits['train']['user']],
-                     R[:, splits['valid']['track']][splits['valid']['user']])
-                )
-
-            return Rs, split_cv
-
-        elif typ == 'inner':
-            triplet = self._db2triplet(R)
-            for trn_id, val_id in kf.split(triplet):
-                train = triplet[trn_id].copy()
-                valid = triplet[val_id].copy()
-                Rs.append(
-                    (
-                        sp.coo_matrix((train[:,2], (train[:,0], train[:,1])),
-                                      shape=R.shape).toarray(),
-                        sp.coo_matrix((valid[:,2], (valid[:,0], valid[:,1])),
-                                      shape=R.shape).toarray()
-                    )
-                )
-            return Rs, split_cv
-
-    @staticmethod
-    def recall_at_k(model, k, R_test, X_test=None, verbose=False):
-        """"""
-        res = []
+        recall = []
+        precision = []
 
         # prediction
         if X_test is None:
@@ -188,26 +162,82 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
 
         for r, r_ in iterator:
             true = np.where(r > 0)[0]
+            if len(true) == 0:
+                continue
 
             pred_at_k = np.argsort(r_)[-k:]
             pred_rank_at_k = [np.where(pred_at_k == t)[0].tolist() for t in true]
             hit_at_k = map(
                 lambda x:x[0], filter(lambda x:len(x) > 0, pred_rank_at_k))
-            res.append(float(len(hit_at_k)) / len(true))
+
+            recall.append(float(len(hit_at_k)) / len(true))
+            precision.append(float(len(hit_at_k)) / k)
 
         # mean recall@k over users
-        return np.mean(res)
+        return np.mean(precision), np.mean(recall)
 
-    def _db2triplet(self, R):
+    @staticmethod
+    def _make_cv(R, n_cv=5, typ='outer'):
         """"""
-        return np.vstack(sp.find(R)).T
+        R = R.T
+        Rs = []
+        split_cv = []
+        kf = KFold(n_splits=n_cv, shuffle=True)
+
+        if typ == 'outer':
+            triplet = _db2triplet(R)
+            for trn_id, val_id in kf.split(range(R.shape[1])):
+                split_cv.append(None)
+
+                trn_track_set = set(trn_id)
+                val_track_set = set(val_id)
+
+                train = np.array(filter(lambda x:x[1] in trn_track_set,
+                                        triplet))
+                valid = np.array(filter(lambda x:x[1] in val_track_set,
+                                        triplet))
+
+                Rs.append(
+                    (
+                        sp.coo_matrix((train[:,2], (train[:,0], train[:,1])),
+                                      shape=R.shape).toarray(),
+                        sp.coo_matrix((valid[:,2], (valid[:,0], valid[:,1])),
+                                      shape=R.shape).toarray()
+                    )
+                )
+
+                # splits = _split_outer(R, trn_id, val_id)
+                # split_cv.append(splits)
+                # Rs.append(
+                #     (R[:, splits['train']['track']][splits['train']['user']],
+                #      R[:, splits['valid']['track']][splits['valid']['user']])
+                # )
+
+            return Rs, split_cv
+
+        elif typ == 'inner':
+            triplet = _db2triplet(R)
+            for trn_id, val_id in kf.split(triplet):
+                train = triplet[trn_id].copy()
+                valid = triplet[val_id].copy()
+                split_cv.append(None)
+                Rs.append(
+                    (
+                        sp.coo_matrix((train[:,2], (train[:,0], train[:,1])),
+                                      shape=R.shape).toarray(),
+                        sp.coo_matrix((valid[:,2], (valid[:,0], valid[:,1])),
+                                      shape=R.shape).toarray()
+                    )
+                )
+            return Rs, split_cv
 
     def _cross_val_score(self, R, X=None):
         """"""
         res = []
+        # X = np.random.rand(*X.shape) # for test
 
-        # 1. maek cv
-        cv, split_cv = self._make_cv(R, typ=self.eval_type)
+        # 1. make cv
+        cv, split_cv = self._make_cv(R, n_cv=self.cv, typ=self.eval_type)
 
         # 2.1. for each cv, run predict
         # 2.2. and score them
@@ -216,22 +246,21 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
                 if split_cv is None or X is None:
                     raise ValueError(
                         '[ERROR] split or X should be passed!')
+
                 # train
-                X_tr = X[split['train']['track']]
-                X_vl = X[split['valid']['track']]
-                self.model.fit(R=train, X=X_tr)
+                self.model.fit(R=train, X=X)
 
                 # valid
                 res.append(
-                    self.recall_at_k(self.model, self.k, valid, X_vl))
+                    self.prec_recall_at_k(self.model, self.k, valid, X))
 
             elif self.eval_type == 'inner':
                 # train
-                self.model.fit(R=train)
+                self.model.fit(R=train, X=X)
 
                 # valid
                 res.append(
-                    self.recall_at_k(self.model, self.k, valid))
+                    self.prec_recall_at_k(self.model, self.k, valid, X))
 
         # 3. return result
         return res
@@ -245,8 +274,13 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         scores = self._cross_val_score(R=R, X=X)
         cv_time = time.time() - t
 
+        precision = np.mean(map(lambda x:x[0], scores))
+        recall = np.mean(map(lambda x:x[1], scores))
+
         return {'classification_report':None, 'confusion_matrix':None,
-                'recall@{:d}_score'.format(self.k):np.mean(scores), 'time':cv_time}
+                'recall@{:d}_score'.format(self.k):recall,
+                'precision@{:d}_score'.format(self.k):precision,
+                'time':cv_time}
 
 def _make_hash(list_):
 	return OrderedDict([(v,k) for k, v in enumerate(list_)])
@@ -285,4 +319,8 @@ def _split_outer(R, trn_idx, val_idx):
         'train':{'user':keep_user_train, 'track':keep_track_train},
         'valid':{'user':keep_user_valid, 'track':keep_track_valid}
     }
+
+def _db2triplet(R):
+    """"""
+    return np.vstack(sp.find(R)).T
 
