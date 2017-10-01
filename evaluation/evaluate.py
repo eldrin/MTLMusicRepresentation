@@ -6,15 +6,17 @@ from itertools import combinations
 
 import pandas as pd
 
-from evaluator.external import ExternalTaskEvaluator
+from evaluator.external import MLEvaluator, RecSysEvaluator
 from helper import print_cm
+
+import h5py
 
 import fire
 
 class Evaluate(object):
     """"""
-    def __init__(self, out_dir=None, comb_lim=2, preproc=None,
-                 n_jobs=-1, keep_metrics=['accuracy']):
+    def __init__(self, out_dir=None, comb_lim=2, preproc=None, n_jobs=-1,
+                 keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
         """"""
         if out_dir is None:
             out_dir = os.getcwd()
@@ -66,8 +68,7 @@ class Evaluate(object):
                                     comb
                                 )
                                 # instantiate evaluator and evaluate
-                                evaluator = ExternalTaskEvaluator(
-                                    fns, self.preproc, self.n_jobs)
+                                evaluator = self._get_evaluator(task, fns)
                                 res = evaluator.evaluate()
 
                                 for metric in self.keep_metrics:
@@ -104,8 +105,14 @@ class Evaluate(object):
                 out_fn += '{}.txt'
 
                 # instantiate evaluator & evaluate
-                evaluator = ExternalTaskEvaluator(
-                    path, self.preproc, self.n_jobs)
+                # TODO: fix this temporary workaround
+                with h5py.File(path[0]) as hf:
+                    if hf.attrs['type'] == 'recommendation':
+                        task = 'recsys'
+                    else:
+                        task = 'no_recsys'
+
+                evaluator = self._get_evaluator(task, path)
                 res = evaluator.evaluate()
 
                 # save & print
@@ -125,6 +132,7 @@ class Evaluate(object):
     @staticmethod
     def _print(res):
         """"""
+
         lines = ''
         if res['classification_report'] is not None:
             lines += '=================  Classification Report =================='
@@ -134,15 +142,30 @@ class Evaluate(object):
             lines += '====================  Confusion Matrix ===================='
             lines += print_cm(*res['confusion_matrix'])
             lines += '\n'
-            lines += 'Overall Accuracy: {:.2%}'.format(res['accuracy'])
+
+        score_key = filter(lambda k: 'score' in k, res.keys())[0]
+        score_name = score_key.split('_score')[0]
+        if score_name == 'accuracy':
+            lines += '{}: {:.2%}'.format(score_name.title(), res[score_key])
         else:
-            lines += 'R2 Score: {:.2f}'.format(res['accuracy'])
+            lines += '{}: {:.4f}'.format(score_name.title(), res[score_key])
 
         lines += '\n'
         lines += 'Time spent: {:.2f} (sec)'.format(res['time'])
         print
         print(lines)
         return lines
+
+    def _get_evaluator(self, task, fns):
+        """"""
+        if task == 'recsys':
+            evaluator = RecSysEvaluator(
+                fns, self.preproc, self.n_jobs)
+        else:
+            evaluator = MLEvaluator(
+                fns, self.preproc, self.n_jobs)
+
+        return evaluator
 
 if __name__ == "__main__":
     fire.Fire(Evaluate)

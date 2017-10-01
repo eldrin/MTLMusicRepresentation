@@ -41,6 +41,17 @@ class BaseMF:
         self.R, self.X = None, None
         self.U, self.V, self.W = None, None, None
 
+
+    @property
+    def n_users(self):
+        """"""
+        return self.R.shape[0]
+
+    @property
+    def n_items(self):
+        """"""
+        return self.R.shape[1]
+
     def _init_params(self, R, X=None):
         """"""
         if X is not None:
@@ -207,3 +218,14 @@ class ContentExplicitALS(BaseALS):
         b = self.lam_c * self.X.T.dot(self.V)
         return np.linalg.solve(A, b)
 
+    def predict_item_factor(self, x):
+        """"""
+        return x.dot(self.W)
+
+    def predict_from_side(self, x):
+        """"""
+        return self.U.dot(self.predict_item_factor(x).T)
+
+    def predict_rating_from_side(self, u, x):
+        """"""
+        return self.U[u].dot(self.predict_item_factor(x).T)

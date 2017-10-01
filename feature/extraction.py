@@ -125,6 +125,7 @@ class BaseExtractor(object):
         else:
             l = max(list(chain.from_iterable(
                 map(lambda r:[int(d) for d in r[2]], self.db_info))))
+            l += 1
             label_dtype = np.int32
 
         self.label_dim = l
