@@ -72,6 +72,7 @@ class BaseExternalTaskEvaluator(object):
     def evaluate(self):
         pass
 
+
 class MLEvaluator(BaseExternalTaskEvaluator):
     """"""
     def __init__(self, fns, preproc=None, n_jobs=-1):
@@ -120,11 +121,10 @@ class MLEvaluator(BaseExternalTaskEvaluator):
                     'r2_score':ac, 'time':cv_time}
 
 
-
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=80, cv=5,
-                 eval_type='outer', n_factors=40, max_iter=20):
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=200, cv=5,
+                 eval_type='outer', bias=False, n_factors=40, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 
@@ -133,21 +133,18 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         self.k = k
 
         if self.task_type == 'recommendation':
-            self.model = ContentExplicitALS(n_factors=n_factors,
-                                            max_iter=max_iter, verbose=True)
-            # self.model = ContentImplicitALS(n_factors=n_factors,
-            #                                 max_iter=max_iter,
-            #                                 lam_u=10, lam_v=100, lam_w=10,
-            #                                 verbose=True)
+            self.model = ContentExplicitALS(n_factors=n_factors, bias=bias, 
+                                            max_iter=max_iter, verbose=False)
         else:
             raise ValueError(
                 '[ERROR] RecSysEvaluator only suports recommendation!')
 
     @staticmethod
-    def prec_recall_at_k(model, k, R_test, X_test=None, verbose=False):
+    def score_at_k(model, k, R_test, X_test=None, verbose=False):
         """"""
         recall = []
         precision = []
+        ndcg = []
 
         # prediction
         if X_test is None:
@@ -161,25 +158,29 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             iterator = zip(R_test, R_pred)
 
         for r, r_ in iterator:
-            true = np.where(r > 0)[0]
-            if len(true) == 0:
+            # true = np.where(r > 0)[0].astype(float).ravel()
+            if np.sum(r) == 0:
                 continue
 
-            pred_at_k = np.argsort(r_)[-k:]
-            pred_rank_at_k = [np.where(pred_at_k == t)[0].tolist() for t in true]
-            hit_at_k = map(
-                lambda x:x[0], filter(lambda x:len(x) > 0, pred_rank_at_k))
+            # relavance sort by pred rank
+            rel = r[np.argsort(r_)][::-1]
+            recall.append(np.sum(rel[:k]) / np.sum(r))
+            precision.append(np.sum(rel[:k]) / k)
+            ndcg.append(ndcg_at_k(rel, k, method=0))
 
-            recall.append(float(len(hit_at_k)) / len(true))
-            precision.append(float(len(hit_at_k)) / k)
+            # pred_at_k = np.argsort(r_)[-k:]
+            # pred_rank_at_k = [np.where(pred_at_k == t)[0].tolist() for t in true]
+            # hit_at_k = map(
+            #     lambda x:x[0], filter(lambda x:len(x) > 0, pred_rank_at_k))
+            # recall.append(float(len(hit_at_k)) / len(true))
+            # precision.append(float(len(hit_at_k)) / k)
 
         # mean recall@k over users
-        return np.mean(precision), np.mean(recall)
+        return np.mean(precision), np.mean(recall), np.mean(ndcg)
 
     @staticmethod
     def _make_cv(R, n_cv=5, typ='outer'):
         """"""
-        R = R.T
         Rs = []
         split_cv = []
         kf = KFold(n_splits=n_cv, shuffle=True)
@@ -188,15 +189,12 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             triplet = _db2triplet(R)
             for trn_id, val_id in kf.split(range(R.shape[1])):
                 split_cv.append(None)
-
                 trn_track_set = set(trn_id)
                 val_track_set = set(val_id)
-
                 train = np.array(filter(lambda x:x[1] in trn_track_set,
                                         triplet))
                 valid = np.array(filter(lambda x:x[1] in val_track_set,
                                         triplet))
-
                 Rs.append(
                     (
                         sp.coo_matrix((train[:,2], (train[:,0], train[:,1])),
@@ -205,14 +203,6 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
                                       shape=R.shape).toarray()
                     )
                 )
-
-                # splits = _split_outer(R, trn_id, val_id)
-                # split_cv.append(splits)
-                # Rs.append(
-                #     (R[:, splits['train']['track']][splits['train']['user']],
-                #      R[:, splits['valid']['track']][splits['valid']['user']])
-                # )
-
             return Rs, split_cv
 
         elif typ == 'inner':
@@ -234,7 +224,6 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
     def _cross_val_score(self, R, X=None):
         """"""
         res = []
-        # X = np.random.rand(*X.shape) # for test
 
         # 1. make cv
         cv, split_cv = self._make_cv(R, n_cv=self.cv, typ=self.eval_type)
@@ -242,25 +231,12 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         # 2.1. for each cv, run predict
         # 2.2. and score them
         for (train, valid), split in zip(cv, split_cv):
-            if self.eval_type == 'outer':
-                if split_cv is None or X is None:
-                    raise ValueError(
-                        '[ERROR] split or X should be passed!')
+            # train
+            self.model.fit(R=train, X=X)
 
-                # train
-                self.model.fit(R=train, X=X)
-
-                # valid
-                res.append(
-                    self.prec_recall_at_k(self.model, self.k, valid, X))
-
-            elif self.eval_type == 'inner':
-                # train
-                self.model.fit(R=train, X=X)
-
-                # valid
-                res.append(
-                    self.prec_recall_at_k(self.model, self.k, valid, X))
+            # valid
+            res.append(
+                self.score_at_k(self.model, self.k, valid, X))
 
         # 3. return result
         return res
@@ -269,6 +245,14 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         """"""
         # concatenate features
         X, R = self.prepare_data()
+        R = R.T # (user, item)
+
+        # shuffle dataset
+        n, m = R.shape
+        rnd_u = np.random.choice(n, n, replace=False)
+        rnd_i = np.random.choice(m, m, replace=False)
+        R = R[rnd_u][:,rnd_i]
+        X = X[rnd_i]
 
         t = time.time()
         scores = self._cross_val_score(R=R, X=X)
@@ -276,10 +260,12 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
 
         precision = np.mean(map(lambda x:x[0], scores))
         recall = np.mean(map(lambda x:x[1], scores))
+        ndcg = np.mean(map(lambda x:x[2], scores))
 
         return {'classification_report':None, 'confusion_matrix':None,
                 'recall@{:d}_score'.format(self.k):recall,
                 'precision@{:d}_score'.format(self.k):precision,
+                'ndcg@{:d}_score'.format(self.k):ndcg,
                 'time':cv_time}
 
 def _make_hash(list_):
@@ -319,6 +305,77 @@ def _split_outer(R, trn_idx, val_idx):
         'train':{'user':keep_user_train, 'track':keep_track_train},
         'valid':{'user':keep_user_valid, 'track':keep_track_valid}
     }
+
+""" code from https://www.kaggle.com/wendykan/ndcg-example """
+def dcg_at_k(r, k, method=0):
+    """Score is discounted cumulative gain (dcg)
+    Relevance is positive real values.  Can use binary
+    as the previous methods.
+    Example from
+    http://www.stanford.edu/class/cs276/handouts/EvaluationNew-handout-6-per.pdf
+    >>> r = [3, 2, 3, 0, 0, 1, 2, 2, 3, 0]
+    >>> dcg_at_k(r, 1)
+    3.0
+    >>> dcg_at_k(r, 1, method=1)
+    3.0
+    >>> dcg_at_k(r, 2)
+    5.0
+    >>> dcg_at_k(r, 2, method=1)
+    4.2618595071429155
+    >>> dcg_at_k(r, 10)
+    9.6051177391888114
+    >>> dcg_at_k(r, 11)
+    9.6051177391888114
+    Args:
+        r: Relevance scores (list or numpy) in rank order
+            (first element is the first item)
+        k: Number of results to consider
+        method: If 0 then weights are [1.0, 1.0, 0.6309, 0.5, 0.4307, ...]
+                If 1 then weights are [1.0, 0.6309, 0.5, 0.4307, ...]
+    Returns:
+        Discounted cumulative gain
+    """
+    r = np.asfarray(r)[:k]
+    if r.size:
+        if method == 0:
+            return r[0] + np.sum(r[1:] / np.log2(np.arange(2, r.size + 1)))
+        elif method == 1:
+            return np.sum(r / np.log2(np.arange(2, r.size + 2)))
+        else:
+            raise ValueError('method must be 0 or 1.')
+    return 0.
+
+def ndcg_at_k(r, k, method=0):
+    """Score is normalized discounted cumulative gain (ndcg)
+    Relevance is positive real values.  Can use binary
+    as the previous methods.
+    Example from
+    http://www.stanford.edu/class/cs276/handouts/EvaluationNew-handout-6-per.pdf
+    >>> r = [3, 2, 3, 0, 0, 1, 2, 2, 3, 0]
+    >>> ndcg_at_k(r, 1)
+    1.0
+    >>> r = [2, 1, 2, 0]
+    >>> ndcg_at_k(r, 4)
+    0.9203032077642922
+    >>> ndcg_at_k(r, 4, method=1)
+    0.96519546960144276
+    >>> ndcg_at_k([0], 1)
+    0.0
+    >>> ndcg_at_k([1], 2)
+    1.0
+    Args:
+        r: Relevance scores (list or numpy) in rank order
+            (first element is the first item)
+        k: Number of results to consider
+        method: If 0 then weights are [1.0, 1.0, 0.6309, 0.5, 0.4307, ...]
+                If 1 then weights are [1.0, 0.6309, 0.5, 0.4307, ...]
+    Returns:
+        Normalized discounted cumulative gain
+    """
+    dcg_max = dcg_at_k(sorted(r, reverse=True), k, method)
+    if not dcg_max:
+        return 0.
+    return dcg_at_k(r, k, method) / dcg_max
 
 def _db2triplet(R):
     """"""

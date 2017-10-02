@@ -27,7 +27,7 @@ class BaseMF:
         self.reg = reg # regularization coeff
 
         self.k = n_factors
-        self.b = bias
+        self.bias = bias
         self.init = init
 
         self.max_iter = max_iter
@@ -38,6 +38,7 @@ class BaseMF:
         # dummy variable
         self.R, self.X = None, None
         self.U, self.V, self.W = None, None, None
+        self.b_u, self.b_i, self.b_w = None, None, None
 
     @property
     def n_users(self):
@@ -54,6 +55,8 @@ class BaseMF:
         if X is not None:
             self.X = X
             self.W = np.random.rand(X.shape[1], self.k) * self.init
+            if self.bias:
+                self.b_w = np.zeros((self.k,))
 
         # currently only supports dense mat ops.
         if sp.isspmatrix(R):
@@ -69,6 +72,9 @@ class BaseMF:
         # factors for outland
         self.U = np.zeros((self.R.shape[0], self.k))
         self.V = np.zeros((self.R.shape[1], self.k))
+        if self.bias:
+            self.b_u = np.zeros((self.R.shape[0],))
+            self.b_i = np.zeros((self.R.shape[1],))
 
         # checkup zero entry row/col and make hahs for post processing
         self.row_hash = OrderedDict([(ix, j) for j, ix in
@@ -83,6 +89,10 @@ class BaseMF:
         # squashed factors for inland
         self.U_ = np.random.rand(self.R_.shape[0], self.k) * self.init
         self.V_ = np.random.rand(self.R_.shape[1], self.k) * self.init
+        if self.bias:
+            self.b_u_ = np.zeros((self.R_.shape[0],))
+            self.b_i_ = np.zeros((self.R_.shape[1],))
+
 
     def fit(self, R, X=None):
         """"""
@@ -97,12 +107,12 @@ class BaseMF:
             cost = self.total_cost()
             self.costs.append(cost)
 
-            self.U_ = self.update_U()
-            self.V_ = self.update_V()
+            self.update_U()
+            self.update_V()
 
             # update content-factor
             if X is not None:
-                self.W = self.update_W()
+                self.update_W()
 
             if self.verbose:
                 iterator.set_description('cost {:.3f}'.format(cost))
@@ -111,6 +121,9 @@ class BaseMF:
         # : reassign squashed factors (trained) into outland factors
         self.U[self.row_hash.keys()] = self.U_
         self.V[self.col_hash.keys()] = self.V_
+        if self.bias:
+            self.b_u[self.row_hash.keys()] = self.b_u_
+            self.b_i[self.col_hash.keys()] = self.b_i_
 
     def predict(self):
         """"""
@@ -118,18 +131,45 @@ class BaseMF:
 
     def predict_all(self):
         """"""
-        return self.U.dot(self.V.T)
+        if not self.bias:
+            return self.U.dot(self.V.T)
+        else:
+            pred = self.U.dot(self.V.T)
+            pred += self.b_u[:, None]
+            pred += self.b_i[None, :]
+            return pred
+
+    def predict_from_item_factor(self, V_):
+        """"""
+        if not self.bias:
+            return self.U.dot(V_.T)
+        else:
+            pred = self.U.dot(V_.T)
+            pred += self.b_u[:, None]
+            pred += self.b_i[None, :]
+            return pred
 
     def predict_rating(self, u, i):
         """"""
-        return self.U[u].dot(self.V[i])
+        return self.U[u].dot(self.V[i]) + self.b_u[u] + self.b_i[i]
 
     def total_cost(self):
         """"""
-        r = self.R_ - self.U_.dot(self.V_.T)
+        pred = self.U_.dot(self.V_.T)
+        if self.bias:
+            pred += self.b_u_[:, None]
+            pred += self.b_i_[None, :]
+
+        r = np.sum((self.R_ - pred)**2)
         u = self.reg * np.sum(self.U_**2)
         v = self.reg * np.sum(self.V_**2)
-        return r + u + v
+        cost = r + u + v
+
+        if self.bias:
+            bu = self.reg * np.sum(self.b_u_**2)
+            bi = self.reg * np.sum(self.b_i_**2)
+            cost += (bu + bi)
+        return cost
 
     @abstractmethod
     def update_V(self):
@@ -148,11 +188,20 @@ class BaseALS(BaseMF):
 
     def update_V(self):
         """"""
-        return self._update_factor(self.R_.T, self.U_, self.reg)
+        if not self.bias:
+            self.V_ = self._update_factor(self.R_.T, self.U_, self.reg)
+        else:
+            self.V_[:], self.b_i_[:] = self._update_factor_bias(
+                self.R_.T, self.U_, self.b_u_, self.reg)
 
     def update_U(self):
         """"""
-        return self._update_factor(self.R_, self.V_, self.reg)
+        if not self.bias:
+            self.U_ = self._update_factor(self.R_, self.V_, self.reg)
+        else:
+            self.U_[:], self.b_u_[:] = self._update_factor_bias(
+                self.R_, self.V_, self.b_i_, self.reg)
+
 
 class ExplicitALS(BaseALS):
 
@@ -173,6 +222,24 @@ class ExplicitALS(BaseALS):
             X.append(np.linalg.solve(A,b))
         return np.array(X)
 
+    @staticmethod
+    def _update_factor_bias(ratings, other_factor, other_b, reg):
+        """"""
+        Y_ = np.concatenate(
+            [other_factor.copy(),
+            np.ones((other_factor.shape[0], 1))],
+            axis=1
+        )
+        YY = Y_.T.dot(Y_)
+        ratings_ = ratings - other_b[None, :]
+        k_ = Y_.shape[1]
+        X_ = []
+        for r in ratings_:
+            A = YY + reg * np.eye(k_)
+            b = r.dot(Y_)
+            X_.append(np.linalg.solve(A, b))
+        X_ = np.array(X_)
+        return X_[:,:-1], X_[:,-1]
 
 class ImplicitALS(BaseALS):
     """"""
@@ -218,8 +285,8 @@ class ImplicitALS(BaseALS):
 class ContentExplicitALS(ExplicitALS):
     """"""
     def __init__(self, n_factors, learning_rate=0.01, max_iter=10,
-                 lam_u=0.1, lam_v=10, lam_w=1., init=0.001,
-                 bias=True, verbose=False, *args, **kwargs):
+                 lam_u=0.1, lam_v=0.1, lam_w=0.01, init=0.01,
+                 bias=False, verbose=False, *args, **kwargs):
         """"""
         super(ContentExplicitALS, self).__init__(n_factors, learning_rate,
                                                  reg=None, max_iter=max_iter,
@@ -231,51 +298,119 @@ class ContentExplicitALS(ExplicitALS):
 
     def update_U(self):
         """"""
-        return self._update_factor(self.R_, self.V_, self.lam_u)
+        if not self.bias:
+            self.U_ = self._update_factor(self.R_, self.V_, self.lam_u)
+        else:
+            self.U_[:], self.b_u_[:] = self._update_factor_bias(
+                self.R_, self.V_, self.b_i_, self.lam_u)
 
     def update_V(self):
         """"""
-        UU = self.U_.T.dot(self.U_)
-        V_ = []
-        for r, x in zip(self.R_.T, self.X_):
-            A = UU + self.lam_v * np.eye(self.k)
-            b = r.dot(self.U_) + self.lam_v * x.dot(self.W)
-            V_.append(np.linalg.solve(A, b))
-        return np.array(V_)
+        if not self.bias:
+            UU = self.U_.T.dot(self.U_)
+            V_ = []
+            for r, x in zip(self.R_.T, self.X_):
+                A = UU + self.lam_v * np.eye(self.k)
+                b = r.dot(self.U_) + self.lam_v * x.dot(self.W)
+                V_.append(np.linalg.solve(A, b))
+            self.V_ = np.array(V_)
+
+        else:
+            U_ = np.concatenate(
+                [self.U_.copy(),
+                np.ones((self.U_.shape[0], 1))],
+                axis=1
+            )
+            UU = U_.T.dot(U_)
+            R_ = self.R_.T - self.b_u_[None, :]
+            k_ = U_.shape[1]
+            V_ = []
+            for r, x, bi in zip(R_, self.X_, self.b_i_):
+                A = UU + self.lam_v * np.eye(k_)
+                c = x.dot(self.W) + self.b_w
+                b = r.dot(U_) + self.lam_v * np.append(c, bi)
+                V_.append(np.linalg.solve(A, b))
+            V_ = np.array(V_)
+
+            self.V_ = V_[:,:-1]
+            self.b_i_ = V_[:,-1]
 
     def update_W(self):
-        d = self.X_.shape[1]
-        XX = self.X_.T.dot(self.X_)
-        A = self.lam_v * XX + self.lam_w * np.eye(d)
-        B = self.lam_v * self.X_.T.dot(self.V_)
-        return np.linalg.solve(A, B)
+        if not self.bias:
+            d = self.X_.shape[1]
+            XX = self.X_.T.dot(self.X_)
+            A = self.lam_v * XX + self.lam_w * np.eye(d)
+            B = self.lam_v * self.X_.T.dot(self.V_)
+            self.W = np.linalg.solve(A, B)
+        else:
+            n, m = self.X_.shape
+            X_ = np.concatenate([self.X_, np.ones((n, 1))], axis=1)
+
+            d_ = X_.shape[1]
+            XX = X_.T.dot(X_)
+            A = self.lam_v * XX + self.lam_w * np.eye(d_)
+            B = self.lam_v * X_.T.dot(self.V_)
+            W_ = np.linalg.solve(A, B)
+            self.W = W_[:-1, :]
+            self.b_w = W_[-1, :]
 
     def total_cost(self):
         """"""
-        r = np.sum((self.R_ - self.U_.dot(self.V_.T))**2)
-        C = self.V_ - self.X_.dot(self.W)
-        c = self.lam_v * np.sum(C**2)
+        pred = self.U_.dot(self.V_.T)
+        if self.bias:
+            pred += self.b_u_[:, None]
+            pred += self.b_i_[None, :]
+
+        r = np.sum((self.R_ - pred)**2)
+
+        pred_v = self.X_.dot(self.W)
+        if self.bias:
+            pred_v += self.b_w
+
+        c = self.lam_v * np.sum((self.V_ - pred_v)**2)
         u = self.lam_u * np.sum(self.U_**2)
         w = self.lam_w * np.sum(self.W**2)
-        return r + c + u + w
+        cost = r + c + u + w
+
+        if self.bias:
+            cost += self.lam_u * np.sum(self.b_u_**2)
+            cost += self.lam_v * np.sum(self.b_i_**2)
+            cost += self.lam_w * np.sum(self.b_w**2)
+
+        return cost
 
     def predict_item_factor(self, x):
         """"""
-        return x.dot(self.W)
+        if not self.bias:
+            return x.dot(self.W)
+        else:
+            return x.dot(self.W) + self.b_w
+
 
     def predict_from_side(self, x):
         """"""
-        return self.U.dot(self.predict_item_factor(x).T)
+        if not self.bias:
+            return self.U.dot(self.predict_item_factor(x).T)
+        else:
+            pred = self.U.dot(self.predict_item_factor(x).T)
+            pred += self.b_u[:, None]
+            pred += self.b_i[None, :]
+            return pred
 
     def predict_rating_from_side(self, u, x):
         """"""
-        return self.U[u].dot(self.predict_item_factor(x).T)
-
+        if not self.bias:
+            return self.U[u].dot(self.predict_item_factor(x).T)
+        else:
+            pred = self.U[u].dot(self.predict_item_factor(x).T)
+            pred += self.b_u[u]
+            pred += self.b_i[None, :]
+            return pred
 
 class ContentImplicitALS(ImplicitALS):
     """"""
     def __init__(self, n_factors, learning_rate=0.01, max_iter=10,
-                 lam_u=0.1, lam_v=10, lam_w=0.1, alpha=1, eps=1e-6, init=0.001,
+                 lam_u=10, lam_v=10, lam_w=10, alpha=1, eps=1e-6, init=0.001,
                  bias=True, verbose=False, *args, **kwargs):
         """"""
         super(ContentImplicitALS, self).__init__(n_factors, learning_rate,
@@ -339,3 +474,20 @@ class ContentImplicitALS(ImplicitALS):
         """"""
         return self.U[u].dot(self.predict_item_factor(x).T)
 
+
+
+if __name__ == "__main__":
+    import h5py
+    hf = h5py.File('/Users/jaykim/Downloads/data/feature50/individual/conv_2d_artist_50_0.0001_ThisIsMyJam_feature.h5')
+    R = hf['y'][:].T
+    X = hf['X'][:]
+    rnd_u = np.random.choice(R.shape[0], R.shape[0], replace=False)
+    rnd_t = np.random.choice(R.shape[1], R.shape[1], replace=False)
+    R = R[rnd_u][:, rnd_t]
+    X = X[rnd_t]
+
+    # model = ExplicitALS(n_factors=10, bias=True, max_iter=15, verbose=True)
+    # model.fit(R)
+    
+    model = ContentExplicitALS(n_factors=50, bias=True, max_iter=15, verbose=True)
+    model.fit(R,X)

@@ -15,7 +15,7 @@ import fire
 
 class Evaluate(object):
     """"""
-    def __init__(self, out_dir=None, comb_lim=2, preproc=None, n_jobs=-1,
+    def __init__(self, out_dir=None, comb_lim=2, preproc=None, n_trial=1, n_jobs=-1,
                  keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
         """"""
         if out_dir is None:
@@ -24,14 +24,20 @@ class Evaluate(object):
         self.out_dir = out_dir
         self.preproc = preproc
         self.comb_lim = comb_lim
-        self.n_jobs = -1
+        self.n_jobs = n_jobs
+        self.n_trial = n_trial
         self.keep_metrics = keep_metrics
 
-    def internal(self, path):
+    def _internal(self, path):
         """"""
         pass
 
     def external(self, path):
+        """"""
+        for n in xrange(self.n_trial):
+            self._external(path)
+
+    def _external(self, path):
         """"""
         # parsing path
         # path can be configuration file, file path, or directory
