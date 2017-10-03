@@ -17,7 +17,7 @@ from sklearn.metrics import (classification_report,
                              r2_score,
                              confusion_matrix)
 
-from model.recsys.model import ContentExplicitALS, ContentImplicitALS
+from model.recsys.model import ContentExplicitALS, ContentImplicitALS, ExplicitALS
 import h5py
 
 class BaseExternalTaskEvaluator(object):
@@ -124,7 +124,7 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
     def __init__(self, fns, preproc=None, n_jobs=-1, k=200, cv=5,
-                 eval_type='outer', bias=False, n_factors=40, max_iter=20):
+                 eval_type='inner', bias=False, n_factors=40, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 
@@ -133,8 +133,10 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         self.k = k
 
         if self.task_type == 'recommendation':
-            self.model = ContentExplicitALS(n_factors=n_factors, bias=bias, 
-                                            max_iter=max_iter, verbose=False)
+            # self.model = ContentExplicitALS(n_factors=n_factors, bias=bias, 
+            #                                 max_iter=max_iter, verbose=False)
+            self.model = ExplicitALS(n_factors=n_factors, bias=bias, 
+                                    max_iter=max_iter, verbose=False)
         else:
             raise ValueError(
                 '[ERROR] RecSysEvaluator only suports recommendation!')
@@ -236,7 +238,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
 
             # valid
             res.append(
-                self.score_at_k(self.model, self.k, valid, X))
+                self.score_at_k(self.model, self.k, valid, X_test=None))
 
         # 3. return result
         return res
@@ -246,13 +248,16 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         # concatenate features
         X, R = self.prepare_data()
         R = R.T # (user, item)
+        X = self.preproc.fit_transform(X)
 
         # shuffle dataset
         n, m = R.shape
         rnd_u = np.random.choice(n, n, replace=False)
         rnd_i = np.random.choice(m, m, replace=False)
         R = R[rnd_u][:,rnd_i]
-        X = X[rnd_i]
+        X = None
+        # X = X[rnd_i]
+        # X = np.random.rand(*X.shape)
 
         t = time.time()
         scores = self._cross_val_score(R=R, X=X)

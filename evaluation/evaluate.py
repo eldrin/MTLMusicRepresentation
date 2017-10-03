@@ -28,24 +28,23 @@ class Evaluate(object):
         self.n_trial = n_trial
         self.keep_metrics = keep_metrics
 
-    def _internal(self, path):
+    def internal(self, path):
         """"""
         pass
 
     def external(self, path):
         """"""
-        for n in xrange(self.n_trial):
-            self._external(path)
-
-    def _external(self, path):
-        """"""
         # parsing path
         # path can be configuration file, file path, or directory
         # config version and filepath version will be developped first
+
+        # feature file directory case ====================================
         if os.path.isdir(path):
             # evaluation all files in dir
             raise NotImplementedError(
                 '[ERROR] directory input is not yet supported!')
+
+        # evlauation config file case ====================================
         else:
             if os.path.splitext(path)[-1] == '.json':
 
@@ -73,13 +72,28 @@ class Evaluate(object):
                                     os.path.join(config['root'], x[1]),
                                     comb
                                 )
+
                                 # instantiate evaluator and evaluate
                                 evaluator = self._get_evaluator(task, fns)
-                                res = evaluator.evaluate()
 
+                                # multiple times
+                                res = [
+                                    evaluator.evaluate()
+                                    for i in range(self.n_trial)
+                                ]
+                                res_df = pd.DataFrame(res)
+                                scores = res_df.filter(like='score')
+
+                                # get stat and put in container
                                 for metric in self.keep_metrics:
-                                    keep_res[task][comb_key] = \
-                                    {metric:res[metric]}
+                                    if metric in scores:
+                                        keep_res[task][comb_key] = \
+                                            {
+                                                metric:{
+                                                    'avg':scores[metric].mean(),
+                                                    'std':scores[metric].std()
+                                                }
+                                            }
 
                                 # save & print
                                 self._save(out_fn, self._print(res))
@@ -95,14 +109,16 @@ class Evaluate(object):
                     for task, scores in keep_res.iteritems():
                         score[task] = {}
                         for int_task, int_scores in scores.iteritems():
-                            score[task][int_task] = int_scores[metric]
+                            score[task][int_task+'.avg'] = int_scores[metric]['avg']
+                            score[task][int_task+'.std'] = int_scores[metric]['std']
 
                     pd.DataFrame(score).to_csv(
                         os.path.join(
                             self.out_dir,
                             'summary.{}.csv'.format(metric)))
 
-            elif os.path.splitext(path)[-1] == '.h5': # feature files case
+            # single feature file case ====================================
+            elif os.path.splitext(path)[-1] == '.h5': 
 
                 # prepare path
                 path = path.split('-')
@@ -118,11 +134,13 @@ class Evaluate(object):
                     else:
                         task = 'no_recsys'
 
-                evaluator = self._get_evaluator(task, path)
-                res = evaluator.evaluate()
+                # TODO: currently add-hoc. need to fix it after
+                for i in range(self.n_trial):
+                    evaluator = self._get_evaluator(task, path)
+                    res = evaluator.evaluate()
 
-                # save & print
-                self._save(out_fn, self._print(res))
+                    # save & print
+                    self._save(out_fn, self._print(res))
 
             else:
                 raise ValueError(
