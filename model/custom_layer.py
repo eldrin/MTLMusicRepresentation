@@ -25,6 +25,8 @@ from ops import _get_stft_kernels, _log_amp
 from lasagne.layers.conv import conv_output_length
 from lasagne.utils import as_tuple
 
+import librosa
+
 class STFTLayer(Layer):
     """Custom Layer for FFT
         outputs magnitude STFT
@@ -106,6 +108,41 @@ class STFTLayer(Layer):
 
         # return T.cast(Xm.dimshuffle(0,3,1,2),config.floatX)
         return Xm.dimshuffle(0,3,1,2)
+
+
+class MelSpecLayer(Layer):
+    """Custom Layer for MelSpec
+        outputs 128 bin Mel Spectrogram
+        input shape is exactly the STFTLayer output
+    """
+    def __init__(self, incoming, sr, n_fft, n_mels=128,
+                 log_amplitude=False, **kwargs):
+        """
+        """
+        super(MelSpecLayer, self).__init__(incoming, **kwargs)
+
+        self.sr = sr
+        self.n_fft = n_fft
+        self.n_mels = n_mels
+        self.log_amp = log_amplitude
+        self.n_ch = incoming.output_shape[1]
+
+        self.mel_kernel = theano.shared(librosa.filters.mel(
+            sr, n_fft, n_mels=n_mels).T.astype(np.float32))
+
+    def get_output_shape_for(self, input_shape):
+        return tuple(input_shape[:3]) + (self.n_mels,)
+
+    def get_output_for(self, input, **kwargs):
+
+        input = input.dimshuffle(0,1,3,2)
+        mel = input.dot(self.mel_kernel)
+        mel = mel.dimshuffle(0,1,3,2)
+
+        if self.log_amp:
+            mel = _log_amp(mel)
+
+        return mel
 
 
 class LayerNormLayer(Layer):

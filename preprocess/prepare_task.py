@@ -34,8 +34,22 @@ def subsample_n_split(fn, tids, subsample=0.05, split=0.1):
     joblib.dump(
         {'train':tids_sub[n_valid:],'valid':tids_sub[:n_valid]}, fn)
 
+def get_intersection():
+    """"""
+    # load all tids from each internal tasks...
+    tids = {}
+    for task, info in TASK_PROCESS.iteritems():
+        print('load {} info...'.format(task))
+        if task == 'artist':
+            db_fn = info['db_fn']['artist']
+        else:
+            db_fn = info['db_fn']
+        tids[task] = set(info['process'].read(db_fn)[1].keys())
 
-def prepare_task(task, out_fn, k=50, n_iter=100, subsample=0.05, split=0.1):
+    # return intersection
+    return list(set.intersection(*tids.values()))
+
+def prepare_task(task, out_fn, subset_fn=None, k=50, n_iter=100, subsample=0.05, split=0.1):
     """"""
     global TASK_PROCESS
     # prepare logger
@@ -47,12 +61,19 @@ def prepare_task(task, out_fn, k=50, n_iter=100, subsample=0.05, split=0.1):
 
     split_fn = os.path.join(dirname, basename) + '.split'
 
+    if subset_fn is not None:
+        # list of tid (string)
+        tids_sub = pkl.load(open(subset_fn))
+    else:
+        tids_sub = subset_fn
+
     # process
     try:
         task_proc = TASK_PROCESS[task]
         logger.info('Initiate...')
         processor = task_proc['process'](
-            n_components=k, db_fn=task_proc['db_fn'], n_iter=n_iter)
+            n_components=k, db_fn=task_proc['db_fn'], n_iter=n_iter,
+            tids=tids_sub)
 
         logger.info('Proccess data...')
         processor.process()

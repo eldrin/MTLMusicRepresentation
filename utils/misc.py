@@ -90,11 +90,14 @@ def get_in_shape(config):
     sr = config.hyper_parameters.sample_rate
     length = config.hyper_parameters.patch_length
 
-    remaining = int(sr*length) % hop_sz
-    sig_len = int(sr*length) - remaining
+    if config.hyper_parameters.input == 'signal':
+        remaining = int(sr*length) % hop_sz
+        sig_len = int(sr*length) - remaining
+        return (None, 2, sig_len)
 
-    return (None, 2, sig_len)
-
+    elif config.hyper_parameters.input == 'melspec':
+        dur = int((length * sr) / hop_sz) + 1
+        return (None, 2, dur, 128)
 
 def get_loggers(config):
     """"""
@@ -137,6 +140,12 @@ def preemphasis(signal):
 
 def deemphasis(signal):
     return lfilter([1, 0.70], 1, signal)
+
+def load_mel(fn):
+    """
+    """
+    a = np.load(fn, mmap_mode='r')
+    return a[0]
 
 def load_audio(fn, sr=None):
     """
@@ -253,14 +262,24 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
 
 def zero_pad_signals(signal):
     """"""
+    n_ch = signal[0].shape[0]
+    time_dim = 1
     longest_len = np.max(
-        [s.shape[-1] if s is not None else 0 for s in signal])
-    S = np.zeros((len(signal), 2, longest_len), dtype=np.float32)
-    M = np.zeros((len(signal), 2, longest_len), dtype=np.int8) # mask
+        [s.shape[time_dim] if s is not None else 0 for s in signal])
+
+    if signal[0].ndim == 3:
+        feat_dim = signal[0].shape[-1]
+        dim = (len(signal), n_ch, longest_len, feat_dim)
+    elif signal[0].ndim == 2:
+        dim = (len(signal), n_ch, longest_len)
+
+    S = np.zeros(dim, dtype=np.float32)
+    M = np.zeros(dim[:3], dtype=np.int8) # mask
     for i, s in enumerate(signal):
         if s is None: continue
-        S[i,:,:s.shape[-1]] = s
-        M[i,:,:s.shape[-1]] = 1
+        S[i,:,:s.shape[time_dim]] = s
+        M[i,:,:s.shape[time_dim]] = 1
+
     return S, M
 
 def prepare_sub_batches(n, dur, signal, mask, target=None):
@@ -268,6 +287,7 @@ def prepare_sub_batches(n, dur, signal, mask, target=None):
     # prepare n subbatch from batch
     batch_sz = len(signal)
     n_ch = signal[0].shape[0]
+    sig_len = signal[0].shape[1]
 
     if target is None:
         target_dim = 1
@@ -278,10 +298,12 @@ def prepare_sub_batches(n, dur, signal, mask, target=None):
         else:
             target_dim = target[0].shape[-1]
 
-    X = np.zeros(((n * batch_sz), n_ch, dur))
+    if signal[0].ndim == 3:
+        X = np.zeros(((n * batch_sz), n_ch, dur, signal[0].shape[-1]))
+    elif signal[0].ndim == 2:
+        X = np.zeros(((n * batch_sz), n_ch, dur))
     Y = np.zeros(((n * batch_sz), target_dim))
     for i, x, m, y in zip(range(batch_sz), signal, mask, target):
-        sig_len = len(np.where(m[0]>0)[0])
         for j in xrange(n):
             st = np.random.choice(sig_len - dur)
             X[j * batch_sz + i] = x[:, st:st+dur]

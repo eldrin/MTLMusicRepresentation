@@ -60,14 +60,14 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
     beta = config.hyper_parameters.l2
 
     if feature_layer is None:
-        feature_layer = 'fc'
+        feature_layer = '{}.fc'
 
     # function containor
     functions = {}
 
     for target in config.target:
         # get access point
-        out_layer_name = 'out.{}'.format(target)
+        out_layer_name = '{}.out'.format(target)
 
         layers = L.get_all_layers(net[out_layer_name])
 
@@ -79,24 +79,7 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
 
         if target=='self':
             train_params.extend(
-                L.get_all_params(net[feature_layer], trainable=True))
-
-        # if target == 'self':
-        #     # loss = binary_crossentropy_over_spectrum
-        #     # loss = categorical_crossentropy_over_spectrum
-        #     loss = lasagne.objectives.squared_error
-
-        #     # put reconstruction after standard scaler
-        #     target_net = OrderedDict()
-        #     target_net, sigma_ = input_block(target_net, config)
-        #     Y = L.get_output(target_net['sclr'], deterministic=True)
-        #     # Y = T.tensor3('target')
-        # else:
-        #     if net[out_layer_name].nonlinearity == softmax:
-        #         loss = lasagne.objectives.categorical_crossentropy
-        #     elif net[out_layer_name].nonlinearity == linear:
-        #         loss = lasagne.objectives.squared_error
-        #     Y = T.matrix('target')
+                L.get_all_params(net['self.fc'], trainable=True))
 
         if net[out_layer_name].nonlinearity == softmax:
             loss = lasagne.objectives.categorical_crossentropy
@@ -137,8 +120,11 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
             input_var_feat = [layers[0].input_var]
             input_var_pred = input_var_feat
 
-        functions[target] = {}
+        # feature is also class dependent
+        feature = L.get_output(get_layer(net, feature_layer.format(target)),
+                               inputs=input_var_feat[0], deterministic=True)
 
+        functions[target] = {}
         functions[target]['train'] = theano.function(
             inputs = cost_rel_inputs,
             updates = updates,
@@ -154,16 +140,12 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
             outputs = O_vl,
             allow_input_downcast = True
         )
+        functions[target]['feature'] = theano.function(
+            inputs = input_var_feat,
+            outputs = feature,
+            allow_input_downcast = True
+        )
 
-    # feature is class independent
-    feature = L.get_output(get_layer(net, feature_layer),
-                           inputs=input_var_feat[0],
-                           deterministic=True)
-    functions['feature'] = theano.function(
-        inputs = input_var_feat,
-        outputs = feature,
-        allow_input_downcast = True
-    )
     return functions
 
 
@@ -203,7 +185,7 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
 
     # prediction / CAM are output dependant
     for target in config.target:
-        out_layer_name = 'out.{}'.format(target)
+        out_layer_name = '{}.out'.format(target)
         functions[target] = {}
 
         c = T.iscalar('class_idx')

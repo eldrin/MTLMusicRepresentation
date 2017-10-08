@@ -64,7 +64,7 @@ def _log_amp(x):
     """
     log_spec = 10 * T.log(T.maximum(x, 1e-10))/T.log(10)
     log_spec = log_spec - T.max(log_spec)  # [-?, 0]
-    log_spec = T.maximum(log_spec, -80.0)  # [-80, 0]
+    log_spec = T.maximum(log_spec, -96.0)  # [-96, 0]
 
     return log_spec
 

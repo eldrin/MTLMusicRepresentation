@@ -18,12 +18,17 @@ from utils.misc import triplet2sparse
 class BaseInternalTask:
     __metaclass__ = ABCMeta
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
         """"""
         self.k = n_components
         self.db_fn = db_fn
         self.n_iter = n_iter
         self.alg = 'plsa'
+        self.split = split
+        if tids is not None:
+            self.tids = set(tids)
+        else:
+            self.tids = tids
 
         self.U = None
         self.V = None
@@ -58,9 +63,9 @@ class BaseInternalTask:
 
 class MFTask(BaseInternalTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
-        """"""
-        super(MFTask, self).__init__(n_components, db_fn, n_iter, alg)
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
+        """ tids: list of subset of tid """
+        super(MFTask, self).__init__(n_components, db_fn, n_iter, tids, split, alg)
 
         self.A = sp.coo_matrix((1,1),dtype=int)
         self.doc_hash = OrderedDict()
@@ -71,15 +76,43 @@ class MFTask(BaseInternalTask):
 
     def process(self):
         """"""
+        # update A / term_hash / doc_hash with target tids
+        if self.tids is not None:
+            # filter 
+            keep_doc = OrderedDict(
+                filter(lambda x:x[0] in self.tids,
+                       self.doc_hash.items())
+            )
+            self.A = self.A[keep_doc.values()]
+
+            keep_term_ix = np.where(
+                np.array(self.A.sum(axis=0) != 0).ravel())[0]
+            keep_term_ix_set = set(keep_term_ix)
+            keep_term = OrderedDict(
+                filter(lambda x:x[1] in keep_term_ix_set,
+                       self.term_hash.items())
+            )
+
+            self.A = self.A[:, keep_term_ix]
+
+            # update hashes to new index
+            self.doc_hash = OrderedDict(
+                zip(keep_doc.keys(), range(len(keep_doc)))
+            )
+            self.term_hash = OrderedDict(
+                zip(keep_term.keys(), range(len(keep_term)))
+            )
+
         self.U = self.mf.fit_transform(self.A)
         self.V = self.mf.components_
 
 
 class MSDTaste(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
         """"""
-        super(MSDTaste, self).__init__(n_components, db_fn, n_iter, alg)
+        super(MSDTaste, self).__init__(n_components, db_fn, n_iter, tids,
+                                       split, alg)
         self.A, self.doc_hash, self.term_hash = self.read(db_fn)
 
     @classmethod
@@ -106,9 +139,10 @@ class MSDTaste(MFTask):
 
 class LastFMTag(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
         """"""
-        super(LastFMTag, self).__init__(n_components, db_fn, n_iter, alg)
+        super(LastFMTag, self).__init__(n_components, db_fn, n_iter, tids,
+                                        split, alg)
         self.A, self.doc_hash, self.term_hash = self.read(db_fn)
 
     @classmethod
@@ -135,9 +169,10 @@ class LastFMTag(MFTask):
 
 class MXMLyrics(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa', tfidf=True):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa', tfidf=True):
         """"""
-        super(MXMLyrics, self).__init__(n_components, db_fn, n_iter, alg)
+        super(MXMLyrics, self).__init__(n_components, db_fn, n_iter, tids,
+                                        split, alg)
         self.A, self.doc_hash, self.term_hash = self.read(db_fn)
 
         # for lyrics, applying TF-IDF makes difference?
@@ -168,9 +203,10 @@ class MXMLyrics(MFTask):
 
 class CDRGenre(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
         """"""
-        super(CDRGenre, self).__init__(n_components, db_fn, n_iter, alg)
+        super(CDRGenre, self).__init__(n_components, db_fn, n_iter, tids,
+                                       split, alg)
         self.A, self.doc_hash, self.term_hash = self.read(db_fn)
 
     @classmethod
@@ -209,9 +245,10 @@ class CDRGenre(MFTask):
 
 class MSDArtist(MFTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='plsa'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='plsa'):
         """"""
-        super(MSDArtist, self).__init__(n_components, db_fn, n_iter, alg)
+        super(MSDArtist, self).__init__(n_components, db_fn, n_iter, tids,
+                                        split, alg)
         A, track_hash_a, artist_hash = self.read(db_fn['artist'])
         T, track_hash_t, tag_hash = LastFMTag.read(db_fn['tag'])
 
@@ -266,12 +303,14 @@ class MSDArtist(MFTask):
             'artists':self.artists
         }
 
+
 class GMMTask(BaseInternalTask):
     """"""
-    def __init__(self, n_components, db_fn, n_iter, alg='em'):
+    def __init__(self, n_components, db_fn, n_iter, tids=None, split=None, alg='em'):
         """"""
-        super(GMMTask, self).__init__(n_components, db_fn, n_iter, alg)
+        super(GMMTask, self).__init__(n_components, db_fn, n_iter, tids, split, alg)
         self.A, self.doc_hash = self.read(db_fn)
+
         if alg=='em':
             self.gmm = GaussianMixture(self.k, max_iter=n_iter)
         elif alg=='variational':
@@ -279,6 +318,16 @@ class GMMTask(BaseInternalTask):
 
     def process(self):
         """"""
+        if self.tids is not None:
+            keep_doc = OrderedDict(
+                filter(lambda x:x[0] in self.tids, self.doc_hash.items())
+            )
+            self.A = self.A[keep_doc.values()]
+            self.doc_hash = OrderedDict(
+                zip(keep_doc.keys(),
+                    range(len(keep_doc)))
+            )
+
         self.gmm.fit(self.A)
         self.U = self.gmm.predict_proba(self.A)
 
@@ -293,6 +342,7 @@ class GMMTask(BaseInternalTask):
             'factor_labels':self.gmm.means_
         }
 
+
 class MSDTempo(GMMTask):
     """"""
     @classmethod
@@ -303,6 +353,7 @@ class MSDTempo(GMMTask):
         tids = data['tids']
         tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
         return A, tids_hash
+
 
 class MSDYear(GMMTask):
     """"""
@@ -317,10 +368,10 @@ class MSDYear(GMMTask):
         tids_hash = OrderedDict([(v,k) for k,v in enumerate(tids)])
         return A, tids_hash
 
+
 class KeyScale(BaseInternalTask):
     """"""
     def __init__(self, db_fn, n_iter):
         """"""
         super(KeyScale, self).__init__(24, db_fn, n_iter, 'plsa')
         # load pre-computed key-scale information (?)
-

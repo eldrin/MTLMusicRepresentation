@@ -73,14 +73,15 @@ class Model:
                                 input_vars=self.input_var)
 
         # assign instance method
-        self._feature = funcs['feature']
         self._partial_fit = {}
         self._cost = {}
         self._predict = {}
+        self._feature = {}
         for target in config.target:
             self._partial_fit[target] = funcs[target]['train']
             self._cost[target] = funcs[target]['valid']
             self._predict[target] = funcs[target]['predict']
+            self._feature[target] = funcs[target]['feature']
 
     @check_task
     @check_autoencoder
@@ -112,9 +113,10 @@ class Model:
             p = self._predict[task](X)
         return p
 
+    @check_task
     def feature(self, X):
         """"""
-        return self._feature(X)
+        return self._feature[task](X)
 
     def save(self):
         """"""
