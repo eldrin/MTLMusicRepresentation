@@ -1,15 +1,17 @@
 {
-    "target":"tempo_gmm",
+    "target":"tag",
 
     "hyper_parameters":{
+        "input":"melspec",
         "batch_size":48,
-	
+        "sub_batch_size":4,
+    	
         "patch_length":2.5,
         "n_fft":1024,
         "hop_size":256,
         "sample_rate":22050,
 
-        "architecture":"2dconv_clf_deep",
+        "architecture":"Conv2DSmallChimera",
         "n_out":20,
         "out_act":"softmax",
 
@@ -38,25 +40,29 @@
         "meta_data":{
             "root":"/mnt/msd/meta_data/",
             "targets":{
-                "tag":"lastfm_tags200_plsa.dat.gz",
+                "tag":"msd_tag_50_plsa_intrsc.dat.gz",
                 "tempo":"msd_tempo.dat.gz",
-                "tempo_gmm":"msd_tempo_gmm.dat.gz",
-                "pref":"user_taste20_wrmf.dat.gz"
+                "tempo_gmm":"bpm_50_gmm.dat.gz",
+                "pref":"user_50_plsa.dat.gz",
+                "lyrics":"lyrics_50_plsa.dat.gz",
+                "artist":"artist_50_plsa.dat.gz"
             },
             "splits":{
-                "tag":"lastfm_tags_split.dat.gz",
-                "tempo":"msd_tempo_split.dat.gz",
-                "tempo_gmm":"msd_tempo_split.dat.gz",
-                "pref":"user_taste_split.dat.gz"
+                "tag":"msd_tag_50_plsa_intrsc.split",
+                "tempo":"bpm_50_gmm.split",
+                "tempo_gmm":"bpm_50_gmm.split",
+                "pref":"user_50_plsa.split",
+                "lyrics":"lyrics_50_plsa.split",
+                "artist":"artist_50_plsa.split"
             }
         },
 
         "audio":{
-            "root":"/mnt/msd/songs/"
+            "root":"/mnt/msdmel/"
         },
 
         "preproc":{
-            "scaler":"/mnt/msd/meta_data/sclr_dbscale_stft.dat.gz"
+            "scaler":"/mnt/msd/meta_data/sclr_dbscale_mel.dat.gz"
         },
 
         "path_map":"/mnt/msd/MSD_to_path.pkl"
