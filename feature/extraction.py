@@ -13,6 +13,7 @@ import librosa
 
 import h5py
 
+from model.preproc.model import MelSpectrogramGPU
 from model.model import Model
 from model.helper import load_check_point, get_debug_funcs
 from utils.misc import get_in_shape, get_layer, pmap, load_audio
@@ -99,9 +100,21 @@ class BaseExtractor(object):
 
         # variable set up
         self.sr = self.config.hyper_parameters.sample_rate
+        self.length = self.config.hyper_parameters.patch_length
+        self.n_fft = self.config.hyper_parameters.n_fft
+        self.hop_sz_trn = self.config.hyper_parameters.hop_size
         self.hop_sz = hop_sz # in second
-        self.in_shape = get_in_shape(self.config)
-        self.hop_samples = int(self.hop_sz * self.sr)
+
+        self.input = self.config.hyper_parameters.input
+        self.hop = int(self.hop_sz * self.sr)
+        sig_len = int(self.sr * self.length)
+        self.sig_len = sig_len - sig_len % self.hop_sz_trn
+
+        # prepare preprocessor if needed
+        if self.config.hyper_parameters.input == 'melspec':
+            self.melspec = MelSpectrogramGPU(
+                2, self.sr, self.n_fft, self.hop_sz_trn)
+
         self.feature_layer = feature_layer
 
         # prepare database
@@ -174,25 +187,33 @@ class BaseExtractor(object):
         if y.ndim < 2:
             y = np.repeat(y[None,:],2,axis=0)
 
-        end = y.shape[-1]
-        X = []
+        end = y.shape[1]
+        X = {target:[] for target in self.targets}
         mean_prob = {target:[] for target in self.targets}
-        for j in xrange(0, end, self.hop_samples):
-            slc = slice(j, j + self.in_shape[-1])
+        for j in xrange(0, end, self.hop):
+            slc = slice(j, j + self.sig_len)
+
             x_chunk = y[:,slc][None,:,:]
 
-            if x_chunk.shape[-1] < self.in_shape[-1]:
+            if x_chunk.shape[2] < self.sig_len:
                 continue
 
-            X.append(self.model.feature(x_chunk))
+            if self.config.hyper_parameters.input == 'melspec':
+                x_chunk = self.melspec.process(x_chunk)
 
             for target in self.targets:
                 if target == 'self': continue
+                X[target].append(self.model.feature(target, x_chunk))
                 mean_prob[target].append(
                     self.model.predict(target, x_chunk))
 
-        feature = np.concatenate(
-            [np.mean(X, axis=0).ravel(), np.std(X, axis=0).ravel()])
+        if len(self.targets) > 1:
+            raise NotImplementedError(
+                '[ERROR] multi target extraction is under construction!')
+        else:
+            target = self.targets[0]
+            feature = np.concatenate(
+                [np.mean(X[target], axis=0).ravel(), np.std(X[target], axis=0).ravel()])
 
         return feature, mean_prob
 

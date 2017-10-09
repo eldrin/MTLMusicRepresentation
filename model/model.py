@@ -114,7 +114,7 @@ class Model:
         return p
 
     @check_task
-    def feature(self, X):
+    def feature(self, task, X):
         """"""
         return self._feature[task](X)
 

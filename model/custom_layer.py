@@ -87,17 +87,23 @@ class STFTLayer(Layer):
             left_ch = input[:,0,:,:][:,None,:,:]
             right_ch = input[:,1,:,:][:,None,:,:]
 
-            X_real_l = T.nnet.conv2d(left_ch,self.W_r,subsample=self.stride)
-            X_real_r = T.nnet.conv2d(right_ch,self.W_r,subsample=self.stride)
+            X_real_l = T.nnet.conv2d(left_ch,self.W_r,subsample=self.stride,
+                                     border_mode='half')
+            X_real_r = T.nnet.conv2d(right_ch,self.W_r,subsample=self.stride,
+                                     border_mode='half')
             X_real = T.concatenate([X_real_l, X_real_r], axis=-1)
 
-            X_imag_l = T.nnet.conv2d(left_ch,self.W_i,subsample=self.stride)
-            X_imag_r = T.nnet.conv2d(right_ch,self.W_i,subsample=self.stride)
+            X_imag_l = T.nnet.conv2d(left_ch,self.W_i,subsample=self.stride,
+                                     border_mode='half')
+            X_imag_r = T.nnet.conv2d(right_ch,self.W_i,subsample=self.stride,
+                                     border_mode='half')
             X_imag = T.concatenate([X_imag_l, X_imag_r], axis=-1)
 
         elif self.n_ch == 1:
-            X_real = T.nnet.conv2d(input,self.W_r,subsample=self.stride)
-            X_imag = T.nnet.conv2d(input,self.W_i,subsample=self.stride)
+            X_real = T.nnet.conv2d(input,self.W_r,subsample=self.stride,
+                                   pad='half')
+            X_imag = T.nnet.conv2d(input,self.W_i,subsample=self.stride,
+                                   pad='half')
 
         # magnitude STFT
         Xm = (X_real**2 + X_imag**2)**0.5
@@ -137,7 +143,7 @@ class MelSpecLayer(Layer):
 
         input = input.dimshuffle(0,1,3,2)
         mel = input.dot(self.mel_kernel)
-        mel = mel.dimshuffle(0,1,3,2)
+        # mel = mel.dimshuffle(0,1,3,2)
 
         if self.log_amp:
             mel = _log_amp(mel)

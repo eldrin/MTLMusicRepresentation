@@ -89,14 +89,14 @@ def get_in_shape(config):
     hop_sz = config.hyper_parameters.hop_size
     sr = config.hyper_parameters.sample_rate
     length = config.hyper_parameters.patch_length
+    remaining = int(sr*length) % hop_sz
+    sig_len = int(sr*length) - remaining
 
     if config.hyper_parameters.input == 'signal':
-        remaining = int(sr*length) % hop_sz
-        sig_len = int(sr*length) - remaining
         return (None, 2, sig_len)
 
     elif config.hyper_parameters.input == 'melspec':
-        dur = int((length * sr) / hop_sz) + 1
+        dur = int(sig_len / hop_sz) + 1
         return (None, 2, dur, 128)
 
 def get_loggers(config):
