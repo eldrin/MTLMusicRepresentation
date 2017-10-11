@@ -30,14 +30,14 @@ DATASET_INFO = {
         'info':'/mnt/bulk2/datasets/Ballroom/Ballroom.dataset.info',
         'type':'classification'
     },
-    'BallroomExt':{
-        'info':'/mnt/bulk2/datasets/BallroomExt/BallroomExt.dataset.info',
-        'type':'classification'
-    },
-    'FMA':{
-        'info':'/mnt/bulk2/datasets/FMA/FMA_MEDIUM.dataset.info',
-        'type':'classification'
-    },
+    # 'BallroomExt':{
+    #     'info':'/mnt/bulk2/datasets/BallroomExt/BallroomExt.dataset.info',
+    #     'type':'classification'
+    # },
+    # 'FMA':{
+    #     'info':'/mnt/bulk2/datasets/FMA/FMA_MEDIUM.dataset.info',
+    #     'type':'classification'
+    # },
     'FMA_SUB':{
         'info':'/mnt/bulk2/datasets/FMA/FMA_MEDIUM_SUB.dataset.info',
         'type':'classification'
@@ -172,9 +172,9 @@ class BaseExtractor(object):
     def _extract_label(self, label):
         """"""
         if self.task_type == 'classification':
-            return self.label_encoder.transform(np.array([label]).ravel())[0]
+            return self.label_encoder.transform(np.array(label).ravel())[0]
         elif self.task_type == 'regression':
-            return float(label)
+            return float(label[0])
         elif self.task_type == 'recommendation':
             y = np.zeros((self.label_dim,))
             y[[int(d) for d in label]] = 1
@@ -219,7 +219,7 @@ class BaseExtractor(object):
 
     def process(self):
         """"""
-        for (ix, fn, label) in tqdm.tqdm(self.db_info):
+        for (ix, fn, label) in tqdm.tqdm(self.db_info, ncols=80):
             ix = int(ix)
             try:
                 self.hf['X'][ix], mean_prob = self._extract_feature(fn)
@@ -239,15 +239,25 @@ class BaseExtractor(object):
 
 def main(task, model_state_fn, out_dir, hop_sz=1., feature_layer='fc'):
     """"""
-    ext = BaseExtractor(
-        fn=model_state_fn,
-        task=task,
-        hop_sz=hop_sz,
-        feature_layer=feature_layer,
-        out_dir=out_dir
-    )
-    ext.process()
-
+    if task.lower() == 'all': # do it all
+        for task_, info in DATASET_INFO.iteritems():
+	    ext = BaseExtractor(
+		fn=model_state_fn,
+		task=task_,
+		hop_sz=hop_sz,
+		feature_layer=feature_layer,
+		out_dir=out_dir
+	    )
+	    ext.process()
+    else: # individual tasks
+	ext = BaseExtractor(
+	    fn=model_state_fn,
+	    task=task,
+	    hop_sz=hop_sz,
+	    feature_layer=feature_layer,
+	    out_dir=out_dir
+        )
+        ext.process()
 
 if __name__ == "__main__":
     fire.Fire(main)

@@ -132,7 +132,7 @@ class Evaluate(object):
                     if hf.attrs['type'] == 'recommendation':
                         task = 'recsys'
                     else:
-                        task = 'no_recsys'
+                        task = hf.attrs['type']
 
                 # TODO: currently add-hoc. need to fix it after
                 for i in range(self.n_trial):
@@ -189,9 +189,21 @@ class Evaluate(object):
         if task == 'recsys':
             evaluator = RecSysEvaluator(
                 fns, self.preproc, self.n_jobs)
-        else:
+
+        elif task == 'regression':
+            if self.preproc is None:
+                print(
+                    '[WARNING] found no preprocessor. set z-scaler for default...'
+                )
+                self.preproc = 'standardize'
+	    evaluator = MLEvaluator(
+	        fns, self.preproc, self.n_jobs)
+
+        elif task == 'classification':
             evaluator = MLEvaluator(
-                fns, self.preproc, self.n_jobs)
+                    fns, self.preproc, self.n_jobs)
+        else:
+            raise ValueError('[ERROR] {} is not supported task!'.format(task))
 
         return evaluator
 

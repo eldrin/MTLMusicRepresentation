@@ -41,6 +41,8 @@ class BaseExternalTaskEvaluator(object):
                 self.preproc = StandardScaler()
             elif preproc == 'pca_whiten':
                 self.preproc = PCA(n_components=256, whiten=True)
+            else:
+                raise ValueError('[ERROR] only supports "standardize" and "pca_whiten" at the moment!')
         else:
             self.preproc = FunctionTransformer(lambda x:x)
 

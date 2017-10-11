@@ -122,7 +122,7 @@ class Conv2DSmall(ConvArchitecture):
 
 class Conv2DSmallChimera(BaseArchitecture):
     """"""
-    def __init__(self, config, branch_at=4, input_mel=True, **kwargs):
+    def __init__(self, config, input_mel=True, **kwargs):
         """"""
         super(Conv2DSmallChimera, self).__init__(config, **kwargs)
 
@@ -136,6 +136,7 @@ class Conv2DSmallChimera(BaseArchitecture):
         self.batch_norm = True
         self.verbose = True
 
+        branch_at = config.hyper_parameters.branch_at
         if isinstance(branch_at, (int, float)):
             if branch_at > len(self.n_convs):
                 raise ValueError(
@@ -147,7 +148,6 @@ class Conv2DSmallChimera(BaseArchitecture):
         else:
             raise ValueError(
                 '[ERROR] branch point must be number or "fc"')
-
         self.branch_at = branch_at
 
 
