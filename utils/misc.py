@@ -1,30 +1,23 @@
 import os
 import sys
-sys.setrecursionlimit(40000)
 import time
 
-import copy
 import subprocess
 import tempfile
 import logging
 import tensorboard_logger as tblog
 
-from concurrent.futures import ProcessPoolExecutor, as_completed, wait
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
-import pandas as pd
 
 from scipy import sparse as sp
-from scipy.ndimage import zoom
+# from scipy.ndimage import zoom
 from scipy.signal import lfilter
 
 from sklearn.externals import joblib
 
 import theano
-from theano import tensor as T
-
-import lasagne
-from lasagne import layers as L
 
 import librosa
 import soundfile as sf
@@ -33,8 +26,10 @@ import sox
 from tqdm import tqdm
 
 import namedtupled
-
 import json
+
+sys.setrecursionlimit(40000)
+
 
 def load_config(fn):
     """"""
@@ -52,9 +47,10 @@ def load_config(fn):
                 [config['hyper_parameters']['out_act']]
 
     # check if targets, outs, acts have same length
-    if any([(len(config['target']) != len(config['hyper_parameters']['n_out'])),
-            (len(config['target']) != len(config['hyper_parameters']['out_act'])),
-            (len(config['hyper_parameters']['n_out']) != \
+    if any(
+        [(len(config['target']) != len(config['hyper_parameters']['n_out'])),
+         (len(config['target']) != len(config['hyper_parameters']['out_act'])),
+            (len(config['hyper_parameters']['n_out']) !=
              len(config['hyper_parameters']['out_act']))]):
         raise ValueError(
             '[ERROR] target, n_out, act_out must have same length!')
@@ -70,8 +66,10 @@ def load_config(fn):
             raise ValueError('[ERROR] target is not existing')
         else:
             split = joblib.load(split_fn)
-            config['paths']['meta_data']['size'][target]['train'] = len(split['train'])
-            config['paths']['meta_data']['size'][target]['valid'] = len(split['valid'])
+            config['paths']['meta_data']['size'][target]['train'] = \
+                len(split['train'])
+            config['paths']['meta_data']['size'][target]['valid'] = \
+                len(split['valid'])
 
     return namedtupled.map(config)
 
@@ -85,7 +83,7 @@ def get_layer(net, layer_name):
 
 def get_in_shape(config):
     """"""
-    win_sz = config.hyper_parameters.n_fft
+    # win_sz = config.hyper_parameters.n_fft
     hop_sz = config.hyper_parameters.hop_size
     sr = config.hyper_parameters.sample_rate
     length = config.hyper_parameters.patch_length
@@ -98,6 +96,7 @@ def get_in_shape(config):
     elif config.hyper_parameters.input == 'melspec':
         dur = int(sig_len / hop_sz) + 1
         return (None, 2, dur, 128)
+
 
 def get_loggers(config):
     """"""
@@ -112,9 +111,10 @@ def get_loggers(config):
     pylog = get_py_logger(log_fn)
 
     # init tensorboard logger
-    tblog.configure(os.path.join(config.paths.tblog,fn))
+    tblog.configure(os.path.join(config.paths.tblog, fn))
 
     return pylog, tblog
+
 
 def get_py_logger(fn):
     """"""
@@ -134,6 +134,7 @@ def get_py_logger(fn):
 
     return rootLogger
 
+
 def preemphasis(signal):
     return lfilter([1, -0.70], 1, signal)
 
@@ -141,11 +142,13 @@ def preemphasis(signal):
 def deemphasis(signal):
     return lfilter([1, 0.70], 1, signal)
 
+
 def load_mel(fn):
     """
     """
     a = np.load(fn, mmap_mode='r')
     return a[0]
+
 
 def load_audio(fn, sr=None):
     """
@@ -153,7 +156,7 @@ def load_audio(fn, sr=None):
     try:
         with tempfile.NamedTemporaryFile(suffix='.wav') as tmpf:
             subprocess.call(
-                ['mpg123','-w',tmpf.name,'-q',fn]
+                ['mpg123', '-w', tmpf.name, '-q', fn]
             )
 
             y, sr_file = sf.read(
@@ -175,7 +178,7 @@ def load_audio(fn, sr=None):
 
             # process mono
             if y.shape[0] < 2:
-                y = np.repeat(y,2,axis=0)
+                y = np.repeat(y, 2, axis=0)
 
     except Exception as e:
         print(e)
@@ -183,7 +186,8 @@ def load_audio(fn, sr=None):
     else:
         return y, sr
 
-def load_audio_batch(fn,sr,mono=False,dur=5.):
+
+def load_audio_batch(fn, sr, mono=False, dur=5.):
     """
     """
     if not os.path.exists(fn):
@@ -193,7 +197,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
     try:
         length = sox.file_info.duration(fn)
         sr_org = sox.file_info.sample_rate(fn)
-        n_samples = sox.file_info.num_samples(fn)
+        # n_samples = sox.file_info.num_samples(fn)
         n_ch = sox.file_info.channels(fn)
 
         if length < dur:
@@ -207,7 +211,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
 
         with tempfile.NamedTemporaryFile(suffix='.wav') as tmpf:
             subprocess.call(
-                ['mpg123','-w',tmpf.name,'-q',fn]
+                ['mpg123', '-w', tmpf.name, '-q', fn]
             )
 
             # st_sec = np.random.choice(int((length-dur)*10))/10.
@@ -215,7 +219,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
             st = np.random.choice(int((length - dur) * sr_org))
             n_frames = int(dur * sr_org)
 
-            y,sr_file = sf.read(
+            y, sr_file = sf.read(
                 tmpf.name, always_2d=True, dtype='float32')
             y = y[st:st+n_frames]
 
@@ -225,13 +229,13 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
             # resampling for outliers
             if int(sr_file) != int(sr):
                 y = librosa.resample(
-                    y,sr_file,sr,
+                    y, sr_file, sr,
                     res_type='kaiser_fast'
                 )
 
             # process mono
             if mono:
-                y = np.repeat(y[None,:],2,axis=0)
+                y = np.repeat(y[None, :], 2, axis=0)
 
         # if length is reasonably shorter than delivery length
         # pad it with zeros
@@ -245,11 +249,11 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         elif src_len < trg_len and src_len >= thresh:
             npad = int(trg_len - src_len)
             y = np.concatenate(
-                [y, np.zeros((y.shape[0],npad))],
+                [y, np.zeros((y.shape[0], npad))],
                 axis=-1
             )
 
-    except sox.SoxiError as ee:
+    except sox.SoxiError:
         # print(ee)
         return None
     except sox.SoxError:
@@ -259,6 +263,7 @@ def load_audio_batch(fn,sr,mono=False,dur=5.):
         return None
     else:
         return y
+
 
 def zero_pad_signals(signal):
     """"""
@@ -274,13 +279,15 @@ def zero_pad_signals(signal):
         dim = (len(signal), n_ch, longest_len)
 
     S = np.zeros(dim, dtype=np.float32)
-    M = np.zeros(dim[:3], dtype=np.int8) # mask
+    M = np.zeros(dim[:3], dtype=np.int8)  # mask
     for i, s in enumerate(signal):
-        if s is None: continue
-        S[i,:,:s.shape[time_dim]] = s
-        M[i,:,:s.shape[time_dim]] = 1
+        if s is None:
+            continue
+        S[i, :, :s.shape[time_dim]] = s
+        M[i, :, :s.shape[time_dim]] = 1
 
     return S, M
+
 
 def prepare_sub_batches(n, dur, signal, mask, target=None):
     """"""
@@ -291,7 +298,7 @@ def prepare_sub_batches(n, dur, signal, mask, target=None):
 
     if target is None:
         target_dim = 1
-        target = -np.ones((batch_sz, target_dim)) # dummy values
+        target = -np.ones((batch_sz, target_dim))  # dummy values
     else:
         if isinstance(target[0], int):
             target_dim = 1
@@ -310,41 +317,50 @@ def prepare_sub_batches(n, dur, signal, mask, target=None):
             Y[j * batch_sz + i] = y
     return X, Y
 
+
 def pmap(function, array, n_jobs=16, use_kwargs=False, front_num=3,
          verbose=False):
     """
     """
-    #We run the first few iterations serially to catch bugs
+    # We run the first few iterations serially to catch bugs
     if front_num > 0:
-        front = [function(**a) if use_kwargs else function(a) for a in array[:front_num]]
-    #If we set n_jobs to 1, just run a list comprehension. This is useful for benchmarking and debugging.
-    if n_jobs==1:
-        if verbose: array_remain = tqdm(array[front_num:])
-        else: array_remain = array[front_num:]
+        front = [function(**a) if use_kwargs else function(a)
+                 for a in array[:front_num]]
+    # If we set n_jobs to 1, just run a list comprehension.
+    # This is useful for benchmarking and debugging.
+    if n_jobs == 1:
+        if verbose:
+            array_remain = tqdm(array[front_num:])
+        else:
+            array_remain = array[front_num:]
         return front + [function(**a) if use_kwargs else function(a) for a in
                         array_remain]
-    #Assemble the workers
+    # Assemble the workers
     with ProcessPoolExecutor(max_workers=n_jobs) as pool:
-        #Pass the elements of array into function
+        # Pass the elements of array into function
         if use_kwargs:
             futures = [pool.submit(function, **a) for a in array[front_num:]]
         else:
             futures = [pool.submit(function, a) for a in array[front_num:]]
-        kwargs = {
-            'total': len(futures),
-            'unit': 'it',
-            'unit_scale': True,
-            'leave': True
-        }
-        #Print out the progress as tasks complete
-        if verbose: compl_futures = tqdm(as_completed(futures))
-        else: compl_futures = as_completed(futures)
+        # kwargs = {
+        #     'total': len(futures),
+        #     'unit': 'it',
+        #     'unit_scale': True,
+        #     'leave': True
+        # }
+        # Print out the progress as tasks complete
+        if verbose:
+            compl_futures = tqdm(as_completed(futures))
+        else:
+            compl_futures = as_completed(futures)
         for f in compl_futures:
             pass
     out = []
-    #Get the results from the futures. 
-    if verbose: enum_futures = tqdm(enumerate(futures))
-    else: enum_futures = enumerate(futures)
+    # Get the results from the futures.
+    if verbose:
+        enum_futures = tqdm(enumerate(futures))
+    else:
+        enum_futures = enumerate(futures)
     for i, future in enum_futures:
         try:
             out.append(future.result())
@@ -365,7 +381,7 @@ class ModifiedBackprop(object):
         if theano.sandbox.cuda.cuda_enabled:
             maybe_to_gpu = theano.sandbox.cuda.as_cuda_ndarray_variable
         else:
-            maybe_to_gpu = lambda x: x
+            def maybe_to_gpu(x): return x
         # We move the input to GPU if needed.
         x = maybe_to_gpu(x)
         # We note the tensor type of the input variable to the nonlinearity
@@ -394,21 +410,22 @@ class GuidedBackprop(ModifiedBackprop):
         dtype = inp.dtype
         return (grd * (inp > 0).astype(dtype) * (grd > 0).astype(dtype),)
 
+
 def test_signal_batching():
     sr = 22050
     min_audio_len = 30 * sr
     max_audio_len = 60 * sr
     dur = int(2.5 * sr)
-    n = 64 # num sample in batch
-    m = 20 # num sub batch in batch
+    n = 64  # num sample in batch
+    m = 20  # num sub batch in batch
 
-    signal = [np.random.rand(n) for n
+    signal = [np.random.rand(n_) for n_
               in np.random.randint(
                   min_audio_len, max_audio_len, size=n)]
     signal, mask = zero_pad_signals(signal)
 
     target = [np.random.rand(20) for _ in xrange(n)]
-    target = [t / t.sum() for t in target] # normalize
+    target = [t / t.sum() for t in target]  # normalize
 
     t = time.time()
     X, Y = prepare_sub_batches(m, dur, signal, mask, target)
@@ -418,32 +435,34 @@ def test_signal_batching():
 
 def triplet2sparse(triplet, doc_hash=None, term_hash=None):
     """"""
-    val = map(lambda x:x[2], triplet)
+    val = map(lambda x: x[2], triplet)
     if doc_hash is None:
-        row = map(lambda x:x[0], triplet)
+        row = map(lambda x: x[0], triplet)
         n_row = len(set(row))
     else:
-        row = map(lambda x:doc_hash[x[0]], triplet)
+        row = map(lambda x: doc_hash[x[0]], triplet)
         n_row = len(doc_hash)
 
     if term_hash is None:
-        col = map(lambda x:x[1], triplet)
+        col = map(lambda x: x[1], triplet)
         n_col = len(set(col))
     else:
-        col = map(lambda x:term_hash[x[1]], triplet)
+        col = map(lambda x: term_hash[x[1]], triplet)
         n_col = len(term_hash)
 
     A = sp.coo_matrix(
         (val, (row, col)), shape=(n_row, n_col), dtype=int
-    ) # (n_items, n_words)
+    )  # (n_items, n_words)
 
     return A
+
 
 def load_test_audio(config):
     """"""
     fn = config.paths.test_audio
     sr = config.hyper_parameters.sample_rate
-    return librosa.load(fn,sr=sr)
+    return librosa.load(fn, sr=sr)
+
 
 if __name__ == "__main__":
     test_signal_batching()

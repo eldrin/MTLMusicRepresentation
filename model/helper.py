@@ -1,16 +1,16 @@
 import os
-from collections import OrderedDict
 import numpy as np
 from sklearn.externals import joblib
+
+import namedtupled
 
 import theano
 import lasagne
 from theano import tensor as T
 
-floatX = theano.config.floatX
 from lasagne import layers as L
-from lasagne.nonlinearities import rectify, tanh, softmax, elu, linear
-from lasagne.regularization import regularize_layer_params, l2, l1
+from lasagne.nonlinearities import softmax, linear
+from lasagne.regularization import regularize_layer_params, l2
 from lasagne.updates import (sgd,
                              nesterov_momentum,
                              adagrad,
@@ -19,9 +19,11 @@ from lasagne.updates import (sgd,
                              rmsprop,
                              adadelta)
 
-from utils.misc import *
-from building_block import input_block
-from ops import mu_law_encode, mu_law_decode
+from utils.misc import get_layer
+from ops import mu_law_encode
+
+floatX = theano.config.floatX
+
 
 def categorical_crossentropy_over_signal(pred, true):
     """ Might be better than l2 norm on signal,
@@ -30,14 +32,15 @@ def categorical_crossentropy_over_signal(pred, true):
     true = mu_law_encode(true)
     return T.nnet.categorical_crossentropy(pred, true)
 
+
 def categorical_crossentropy_over_spectrum(pred, true):
     # normalize in frequency side
-    true_n = true / (true.sum(axis=2)[:,:,None,:])
+    true_n = true / (true.sum(axis=2)[:, :, None, :])
     true_n = true_n.dimshuffle(0, 1, 3, 2)
     true_n = true_n.reshape((true_n.shape[0] * true_n.shape[1] *
                              true_n.shape[2], true_n.shape[-1]))
 
-    pred = pred.dimshuffle(0,1,3,2)
+    pred = pred.dimshuffle(0, 1, 3, 2)
     pred = pred.reshape((pred.shape[0] * pred.shape[1] *
                          pred.shape[2], pred.shape[-1]))
 
@@ -45,13 +48,15 @@ def categorical_crossentropy_over_spectrum(pred, true):
 
     return T.nnet.nnet.categorical_crossentropy(pred, true_n)
 
+
 def binary_crossentropy_over_spectrum(pred, true):
     # normalize in frequency side
-    true_n = true / (true.sum(axis=2)[:,:,None,:] + 0.000001)
+    true_n = true / (true.sum(axis=2)[:, :, None, :] + 0.000001)
     pred = T.nnet.sigmoid(pred)
     return T.nnet.nnet.binary_crossentropy(pred, true_n)
 
-def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
+
+def get_train_funcs(net, config, input_vars=None, **kwargs):
     """
     """
     # optimizer setting
@@ -59,8 +64,8 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
     lr = config.hyper_parameters.learning_rate
     beta = config.hyper_parameters.l2
 
-    if feature_layer is None:
-        feature_layer = '{}.fc'
+    # currently, we will only use 'fc' output as feature
+    feature_layer = '{}.fc'
 
     # function containor
     functions = {}
@@ -71,13 +76,12 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
 
         layers = L.get_all_layers(net[out_layer_name])
 
-        O = L.get_output(net[out_layer_name],deterministic=False)
-        O_vl = L.get_output(net[out_layer_name],deterministic=True)
+        O = L.get_output(net[out_layer_name], deterministic=False)
+        O_vl = L.get_output(net[out_layer_name], deterministic=True)
 
-        train_params = L.get_all_params(net[out_layer_name],trainable=True)
-        non_train_params = L.get_all_params(net[out_layer_name],trainable=False)
+        train_params = L.get_all_params(net[out_layer_name], trainable=True)
 
-        if target=='self':
+        if target == 'self':
             train_params.extend(
                 L.get_all_params(net['self.fc'], trainable=True))
 
@@ -87,17 +91,17 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
             loss = lasagne.objectives.squared_error
         Y = T.matrix('target')
 
-        error = loss(O,Y).mean()
-        error_vl = loss(O_vl,Y).mean()
+        error = loss(O, Y).mean()
+        error_vl = loss(O_vl, Y).mean()
 
         # regularization terms
-        reg_DNN = beta * regularize_layer_params(layers,l2)
+        reg_DNN = beta * regularize_layer_params(layers, l2)
 
         cost = error + reg_DNN
         cost_vl = error_vl + reg_DNN
 
         # prepare update rule
-        updates = optimizer(cost,train_params,learning_rate=lr)
+        updates = optimizer(cost, train_params, learning_rate=lr)
 
         # compile functions
         if target == 'self':
@@ -116,7 +120,7 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
                 cost_rel_inputs = list(input_vars)
                 cost_rel_inputs.append(Y)
             else:
-                cost_rel_inputs = [layers[0].input_var,Y]
+                cost_rel_inputs = [layers[0].input_var, Y]
             input_var_feat = [layers[0].input_var]
             input_var_pred = input_var_feat
 
@@ -126,24 +130,24 @@ def get_train_funcs(net, config, feature_layer=None, input_vars=None, **kwargs):
 
         functions[target] = {}
         functions[target]['train'] = theano.function(
-            inputs = cost_rel_inputs,
-            updates = updates,
+            inputs=cost_rel_inputs,
+            updates=updates,
             allow_input_downcast=True
         )
         functions[target]['valid'] = theano.function(
-            inputs = cost_rel_inputs,
-            outputs = cost_vl,
+            inputs=cost_rel_inputs,
+            outputs=cost_vl,
             allow_input_downcast=True
         )
         functions[target]['predict'] = theano.function(
-            inputs = input_var_pred,
-            outputs = O_vl,
-            allow_input_downcast = True
+            inputs=input_var_pred,
+            outputs=O_vl,
+            allow_input_downcast=True
         )
         functions[target]['feature'] = theano.function(
-            inputs = input_var_feat,
-            outputs = feature,
-            allow_input_downcast = True
+            inputs=input_var_feat,
+            outputs=feature,
+            allow_input_downcast=True
         )
 
     return functions
@@ -162,11 +166,11 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
 
     # feature is not output dependant
     feature = L.get_output(
-        feature_layer,deterministic=True)
+        feature_layer, deterministic=True)
     functions['features'] = theano.function(
-        inputs = [layers[0].input_var],
-        outputs = feature,
-        allow_input_downcast = True
+        inputs=[layers[0].input_var],
+        outputs=feature,
+        allow_input_downcast=True
     )
 
     # implement feature map per each layer
@@ -175,12 +179,12 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
             get_layer(net, layer), deterministic=True
         )
         for layer
-        in ['conv1.pl','conv2.pl','conv3.pl','conv4.pl']
+        in ['conv1.pl', 'conv2.pl', 'conv3.pl', 'conv4.pl']
     ]
     functions['filter_response'] = theano.function(
-        inputs = [layers[0].input_var],
-        outputs = features,
-        allow_input_downcast = True
+        inputs=[layers[0].input_var],
+        outputs=features,
+        allow_input_downcast=True
     )
 
     # prediction / CAM are output dependant
@@ -194,27 +198,27 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
         output_layer = get_layer(net, out_layer_name)
 
         O_vl, CAM_vl = L.get_output(
-            [output_layer,cam_layer], deterministic=True)
+            [output_layer, cam_layer], deterministic=True)
 
         # prediction function
         functions[target]['predict'] = theano.function(
-            inputs = [layers[0].input_var],
-            outputs = O_vl,
-            allow_input_downcast = True
+            inputs=[layers[0].input_var],
+            outputs=O_vl,
+            allow_input_downcast=True
         )
 
         # implement grad-cam
-        filter_weight = T.grad(O_vl[i,c],wrt=[CAM_vl])[0]
-        filter_weight_gap = filter_weight.mean(axis=(2,3))
+        filter_weight = T.grad(O_vl[i, c], wrt=[CAM_vl])[0]
+        filter_weight_gap = filter_weight.mean(axis=(2, 3))
 
         weighted_feature_map = T.nnet.relu(
-            (filter_weight_gap[:,:,None,None] * CAM_vl).sum(axis=1)
+            (filter_weight_gap[:, :, None, None] * CAM_vl).sum(axis=1)
         )
 
         functions[target]['gradcam'] = theano.function(
-            inputs = [layers[0].input_var,i,c],
-            outputs = weighted_feature_map,
-            allow_input_downcast = True
+            inputs=[layers[0].input_var, i, c],
+            outputs=weighted_feature_map,
+            allow_input_downcast=True
         )
 
         # TODO: saliency map is not bit treaky for MTL case
@@ -242,15 +246,26 @@ def get_debug_funcs(net, feature_layer, cam_layer, config):
     return functions
 
 
-def test_model_building():
+# def test_model_building():
+#     """
+#     """
+#     # model_comp = build_convae_deep(
+#     #     in_shape=(None,2,22050 * 5 - 22050 * 5 % 256)
+#     # )
+#     model_comp = build_2dconv_clf_deep(
+#         in_shape=(None,2,513,432)
+#     )
+
+
+def save_check_point(it, network, config):
     """
     """
-    # model_comp = build_convae_deep(
-    #     in_shape=(None,2,22050 * 5 - 22050 * 5 % 256)
-    # )
-    model_comp = build_2dconv_clf_deep(
-        in_shape=(None,2,513,432)
-    )
+    fns = get_check_point_fns(config)
+    config_dict = namedtupled.reduce(config)
+
+    np.savez(fns['param'],
+             *lasagne.layers.get_all_param_values(network.values()))
+    joblib.dump({'iter': it, 'config': config_dict}, fns['state'])
 
 
 def load_check_point(network, config):
@@ -278,17 +293,6 @@ def load_check_point(network, config):
     return it, network
 
 
-def save_check_point(it, network, config):
-    """
-    """
-    fns = get_check_point_fns(config)
-    config_dict = namedtupled.reduce(config)
-
-    np.savez(fns['param'],
-             *lasagne.layers.get_all_param_values(network.values()))
-    joblib.dump({'iter':it, 'config':config_dict}, fns['state'])
-
-
 def get_check_point_fns(config):
     """"""
     fns = {}
@@ -306,9 +310,11 @@ def get_check_point_fns(config):
         fns['state'] = os.path.join(dump_root, fname + suffix_state)
 
     except Exception as e:
-        raise e # TODO: elaborate this
+        raise e  # TODO: elaborate this
 
     return fns
 
+
 if __name__ == "__main__":
-    test_model_building()
+    pass
+    # test_model_building()
