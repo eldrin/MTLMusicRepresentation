@@ -146,7 +146,8 @@ def deemphasis(signal):
 def load_mel(fn):
     """
     """
-    a = np.load(fn, mmap_mode='r')
+    # a = np.load(fn, mmap_mode='r')
+    a = np.load(fn)
     return a[0]
 
 
