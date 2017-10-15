@@ -1,9 +1,11 @@
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from collections import OrderedDict
 
 from lasagne import layers as L
 from lasagne.nonlinearities import *
-from building_block import input_block, conv_block, output_block, conv2d
+from building_block import input_block, conv_block, output_block
+from custom_layer import build_siamese
+
 
 class BaseArchitecture(object):
     """"""
@@ -20,7 +22,7 @@ class BaseArchitecture(object):
         # activation setting
         exec(
             "from lasagne.nonlinearities import {}".format(
-            self.config.hyper_parameters.activation)
+                self.config.hyper_parameters.activation)
         )
         self.non_lin = eval(self.config.hyper_parameters.activation)
 
@@ -28,7 +30,7 @@ class BaseArchitecture(object):
         if hasattr(self.config.hyper_parameters, 'feature_activation'):
             exec(
                 "from lasagne.nonlinearities import {}".format(
-                self.config.hyper_parameters.feature_activation)
+                    self.config.hyper_parameters.feature_activation)
             )
             self.feat_non_lin = eval(
                 self.config.hyper_parameters.feature_activation)
@@ -44,6 +46,7 @@ class BaseArchitecture(object):
     def build(self):
         """"""
         pass
+
 
 class ConvArchitecture(BaseArchitecture):
     """"""
@@ -62,17 +65,18 @@ class ConvArchitecture(BaseArchitecture):
     def build(self):
         """"""
         # apply size multiplier
-        self.n_filters = map(lambda x:x * self.m, self.n_filters)
+        self.n_filters = map(lambda x: x * self.m, self.n_filters)
 
         # network dict & set input block
         self.net, self.variables['sigma'] = input_block(self.net, self.config)
 
         # set conv blocks
-        for i, (n_conv, n_filter, flt_sz, stride, pool_sz) in enumerate(zip(
-            self.n_convs, self.n_filters, self.filter_sizes, self.strides, self.pool_sizes)):
+        it = zip(self.n_convs, self.n_filters, self.filter_sizes,
+                 self.strides, self.pool_sizes)
+        for i, (n_conv, n_filter, flt_sz, stride, pool_sz) in enumerate(it):
 
-            if i == (len(self.n_filters)-1):
-                non_lins = [self.non_lin] * (n_conv-1)  + [self.feat_non_lin]
+            # if i == (len(self.n_filters)-1):
+            #     non_lins = [self.non_lin] * (n_conv-1) + [self.feat_non_lin]
 
             self.net = conv_block(
                 self.net, n_convs=n_conv, n_filters=n_filter,
@@ -81,8 +85,8 @@ class ConvArchitecture(BaseArchitecture):
                 name='conv{:d}'.format(i), verbose=self.verbose)
 
         # set output block
-        self.net, self.variables['inputs'] = \
-                output_block(self.net, self.config, self.non_lin)
+        self.net, self.variables['inputs'] = output_block(
+            self.net, self.config, self.non_lin)
 
         return self.net, self.variables
 
@@ -96,10 +100,10 @@ class Conv2DDeep(ConvArchitecture):
         # set architecture configuration
         self.n_convs = [1, 1, 2, 3, 3, 3]
         self.n_filters = [64, 128, 256, 384, 512, 512]
-        self.filter_sizes = [(5,5), (3,3), (3,3), (3,3), (3,3),
-                             [(3,3), (3,3), (1,1)]]
-        self.strides = [(2,2), None, None, None, None, None]
-        self.pool_sizes = [(2,2), (2,2), (2,2), (2,2), (2,2), None]
+        self.filter_sizes = [(5, 5), (3, 3), (3, 3), (3, 3), (3, 3),
+                             [(3, 3), (3, 3), (1, 1)]]
+        self.strides = [(2, 2), None, None, None, None, None]
+        self.pool_sizes = [(2, 2), (2, 2), (2, 2), (2, 2), (2, 2), None]
         self.batch_norm = True
         self.verbose = True
 
@@ -113,12 +117,13 @@ class Conv2DSmall(ConvArchitecture):
         # set architecture configuration
         self.n_convs = [1, 1, 2, 2, 3]
         self.n_filters = [16, 32, 64, 128, 256]
-        self.filter_sizes = [(5,5), (3,3), (3,3), (3,3),
-                             [(3,3), (3,3), (1,1)]]
-        self.strides = [(2,2), None, None, None, None]
-        self.pool_sizes = [(2,2), (2,2), (2,2), (2,2), None]
+        self.filter_sizes = [(5, 5), (3, 3), (3, 3), (3, 3),
+                             [(3, 3), (3, 3), (1, 1)]]
+        self.strides = [(2, 2), None, None, None, None]
+        self.pool_sizes = [(2, 2), (2, 2), (2, 2), (2, 2), None]
         self.batch_norm = True
         self.verbose = True
+
 
 class Conv2DSmallChimera(BaseArchitecture):
     """"""
@@ -129,10 +134,10 @@ class Conv2DSmallChimera(BaseArchitecture):
         self.mel = input_mel
         self.n_convs = [1, 1, 2, 2, 2, 3]
         self.n_filters = [16, 32, 64, 128, 256, 256]
-        self.filter_sizes = [(5,5), (3,3), (3,3), (3,3),
-                             (3,3), [(3,3), (3,3), (1,1)]]
-        self.strides = [(2,1), None, None, None, None, None]
-        self.pool_sizes = [(2,2), (2,2), (2,2), (2,2), (2,2), None]
+        self.filter_sizes = [(5, 5), (3, 3), (3, 3), (3, 3),
+                             (3, 3), [(3, 3), (3, 3), (1, 1)]]
+        self.strides = [(2, 1), None, None, None, None, None]
+        self.pool_sizes = [(2, 2), (2, 2), (2, 2), (2, 2), (2, 2), None]
         self.batch_norm = True
         self.verbose = True
 
@@ -150,7 +155,6 @@ class Conv2DSmallChimera(BaseArchitecture):
                 '[ERROR] branch point must be number or "fc"')
         self.branch_at = branch_at
 
-
     def build(self):
         """"""
         # output setting
@@ -162,7 +166,7 @@ class Conv2DSmallChimera(BaseArchitecture):
         targets = self.config.target
 
         # apply size multiplier
-        self.n_filters = map(lambda x:x * self.m, self.n_filters)
+        self.n_filters = map(lambda x: x * self.m, self.n_filters)
 
         # network dict & set input block
         self.net, self.variables['sigma'] = input_block(
@@ -179,7 +183,7 @@ class Conv2DSmallChimera(BaseArchitecture):
                     self.batch_norm, self.net.keys()[-1], name)
             # GAP
             self.net['gap'] = L.batch_norm(L.GlobalPoolLayer(
-                self.net[next(reversed(net))], name='gap'))
+                self.net[next(reversed(self.net))], name='gap'))
             self.net['fc'] = L.dropout(
                 L.batch_norm(
                     L.DenseLayer(
@@ -225,7 +229,7 @@ class Conv2DSmallChimera(BaseArchitecture):
             out_layer_names = []
             for target, n_out, out_act in zip(targets, n_outs, out_acts):
                 # first conv_block for each branch
-                j = self.branch_at-1 # branch_point_ix
+                j = self.branch_at-1  # branch_point_ix
                 name = '{}.conv{:d}'.format(target, j+1)
                 self.net = conv_block(
                     self.net, self.n_convs[j], self.n_filters[j],
