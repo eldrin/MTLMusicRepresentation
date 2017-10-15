@@ -6,7 +6,6 @@ from theano.tensor.nnet.abstract_conv import (AbstractConv3d,
 
 from theano import config
 
-import lasagne
 from lasagne import layers as L
 from lasagne.layers import get_all_layers
 from lasagne.layers import MergeLayer, Layer, InputLayer, InverseLayer
@@ -27,19 +26,19 @@ from lasagne.utils import as_tuple
 
 import librosa
 
+
 class STFTLayer(Layer):
     """Custom Layer for FFT
         outputs magnitude STFT
         input shape is same as Conv2DLayer
     """
-    def __init__(
-        self, incoming, window=scipy.signal.hann, n_ch=2,
-        n_fft=2048, hop_size=512, log_amplitude=True, **kwargs):
+    def __init__(self, incoming, window=scipy.signal.hann, n_ch=2,
+                 n_fft=2048, hop_size=512, log_amplitude=True, **kwargs):
         """
         """
         super(STFTLayer, self).__init__(incoming, **kwargs)
 
-        n = 2 # 2D convolution
+        n = 2  # 2D convolution
 
         if n_ch > 2 or n_ch < 1:
             raise ValueError(
@@ -52,8 +51,8 @@ class STFTLayer(Layer):
         self.hop_size = hop_size
         self.log_amp = log_amplitude
 
-        self.filter_size = as_tuple((n_fft,1), n, int)
-        self.stride = as_tuple((hop_size,1), n, int)
+        self.filter_size = as_tuple((n_fft, 1), n, int)
+        self.stride = as_tuple((hop_size, 1), n, int)
 
         # dft kernels for real and imaginary domain
         W_r, W_i = _get_stft_kernels(
@@ -67,42 +66,41 @@ class STFTLayer(Layer):
             trainable=False, regularizable=False)
 
     def get_output_shape_for(self, input_shape):
-        pad = (0,0)
+        pad = (0, 0)
         batchsize = input_shape[0]
         shape_raw = ((batchsize, self.n_fft/2+1) +
-            tuple(conv_output_length(input, filter, stride, p)
-                for input, filter, stride, p
-                in zip(input_shape[2:], self.filter_size,
-                    self.stride, pad)))
+                     tuple(conv_output_length(input, filter, stride, p)
+                           for input, filter, stride, p
+                           in zip(input_shape[2:], self.filter_size,
+                                  self.stride, pad)))
 
         if self.n_ch == 2:
             return (shape_raw[0], 2, shape_raw[1], shape_raw[2])
         elif self.n_ch == 1:
             return (shape_raw[0], 1, shape_raw[1], shape_raw[2])
 
-
     def get_output_for(self, input, **kwargs):
 
         if self.n_ch == 2:
-            left_ch = input[:,0,:,:][:,None,:,:]
-            right_ch = input[:,1,:,:][:,None,:,:]
+            left_ch = input[:, 0, :, :][:, None, :, :]
+            right_ch = input[:, 1, :, :][:, None, :, :]
 
-            X_real_l = T.nnet.conv2d(left_ch,self.W_r,subsample=self.stride,
+            X_real_l = T.nnet.conv2d(left_ch, self.W_r, subsample=self.stride,
                                      border_mode='half')
-            X_real_r = T.nnet.conv2d(right_ch,self.W_r,subsample=self.stride,
+            X_real_r = T.nnet.conv2d(right_ch, self.W_r, subsample=self.stride,
                                      border_mode='half')
             X_real = T.concatenate([X_real_l, X_real_r], axis=-1)
 
-            X_imag_l = T.nnet.conv2d(left_ch,self.W_i,subsample=self.stride,
+            X_imag_l = T.nnet.conv2d(left_ch, self.W_i, subsample=self.stride,
                                      border_mode='half')
-            X_imag_r = T.nnet.conv2d(right_ch,self.W_i,subsample=self.stride,
+            X_imag_r = T.nnet.conv2d(right_ch, self.W_i, subsample=self.stride,
                                      border_mode='half')
             X_imag = T.concatenate([X_imag_l, X_imag_r], axis=-1)
 
         elif self.n_ch == 1:
-            X_real = T.nnet.conv2d(input,self.W_r,subsample=self.stride,
+            X_real = T.nnet.conv2d(input, self.W_r, subsample=self.stride,
                                    pad='half')
-            X_imag = T.nnet.conv2d(input,self.W_i,subsample=self.stride,
+            X_imag = T.nnet.conv2d(input, self.W_i, subsample=self.stride,
                                    pad='half')
 
         # magnitude STFT
@@ -113,7 +111,7 @@ class STFTLayer(Layer):
             Xm = _log_amp(Xm)
 
         # return T.cast(Xm.dimshuffle(0,3,1,2),config.floatX)
-        return Xm.dimshuffle(0,3,1,2)
+        return Xm.dimshuffle(0, 3, 1, 2)
 
 
 class MelSpecLayer(Layer):
@@ -141,7 +139,7 @@ class MelSpecLayer(Layer):
 
     def get_output_for(self, input, **kwargs):
 
-        input = input.dimshuffle(0,1,3,2)
+        input = input.dimshuffle(0, 1, 3, 2)
         mel = input.dot(self.mel_kernel)
         # mel = mel.dimshuffle(0,1,3,2)
 
@@ -317,17 +315,21 @@ class LNGRULayer(MergeLayer):
         (self.W_in_to_updategate, self.W_hid_to_updategate, self.b_updategate,
          self.alpha_in_to_updategate, self.beta_in_to_updategate,
          self.alpha_hid_to_updategate, self.beta_hid_to_updategate,
-         self.nonlinearity_updategate) = add_gate_params(updategate, 'updategate')
+         self.nonlinearity_updategate) = add_gate_params(
+             updategate, 'updategate')
 
         (self.W_in_to_resetgate, self.W_hid_to_resetgate, self.b_resetgate,
          self.alpha_in_to_resetgate, self.beta_in_to_resetgate,
          self.alpha_hid_to_resetgate, self.beta_hid_to_resetgate,
-         self.nonlinearity_resetgate) = add_gate_params(resetgate, 'resetgate')
+         self.nonlinearity_resetgate) = add_gate_params(
+             resetgate, 'resetgate')
 
-        (self.W_in_to_hidden_update, self.W_hid_to_hidden_update, self.b_hidden_update, 
-         self.alpha_in_to_hidden_update, self.beta_in_to_hidden_update,
-         self.alpha_hid_to_hidden_update, self.beta_hid_to_hidden_update,
-         self.nonlinearity_hidden_update) = add_gate_params(hidden_update, 'hidden_update')
+        (self.W_in_to_hidden_update, self.W_hid_to_hidden_update,
+         self.b_hidden_update, self.alpha_in_to_hidden_update,
+         self.beta_in_to_hidden_update, self.alpha_hid_to_hidden_update,
+         self.beta_hid_to_hidden_update,
+         self.nonlinearity_hidden_update) = add_gate_params(
+             hidden_update, 'hidden_update')
 
         # Initialize hidden state
         if isinstance(hid_init, Layer):
@@ -363,7 +365,6 @@ class LNGRULayer(MergeLayer):
         output = (z - z.mean(-1, keepdims=True)) / T.sqrt(z.var(-1, keepdims=True) + self._eps)
         output = alpha * output + beta
         return output
-
 
     def __gru_fun__(self, inputs, **kwargs):
         """
@@ -428,11 +429,12 @@ class LNGRULayer(MergeLayer):
             # input is then (n_batch, n_time_steps, 3*num_units).
             big_ones = T.ones((seq_len, num_batch, 1))
             input = T.dot(input, W_in_stacked)
-            input = self.__ln__(input,
-                                T.dot(big_ones, alpha_in_stacked.dimshuffle('x', 0)),
-                                beta_in_stacked) + b_stacked
+            input = self.__ln__(
+                input, T.dot(big_ones, alpha_in_stacked.dimshuffle('x', 0)),
+                beta_in_stacked) + b_stacked
 
         ones = T.ones((num_batch, 1))
+
         # At each call to scan, input_n will be (n_time_steps, 3*num_units).
         # We define a slicing function that extract the input to each GRU gate
         def slice_w(x, n):
@@ -444,15 +446,15 @@ class LNGRULayer(MergeLayer):
             if not self.precompute_input:
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
                 input_n = T.dot(input_n, W_in_stacked)
-                input_n = self.__ln__(input_n,
-                                      T.dot(ones, alpha_in_stacked.dimshuffle('x', 0)),
-                                      beta_in_stacked) + b_stacked
+                input_n = self.__ln__(
+                    input_n, T.dot(ones, alpha_in_stacked.dimshuffle('x', 0)),
+                    beta_in_stacked) + b_stacked
 
             # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
             hid_input = T.dot(hid_previous, W_hid_stacked)
-            hid_input = self.__ln__(hid_input,
-                                    T.dot(ones, alpha_hid_stacked.dimshuffle('x', 0)),
-                                    beta_hid_stacked)
+            hid_input = self.__ln__(
+                hid_input, T.dot(ones, alpha_hid_stacked.dimshuffle('x', 0)),
+                beta_hid_stacked)
 
             # Reset and update gates
             resetgate = slice_w(hid_input, 0) + slice_w(input_n, 0)
@@ -476,9 +478,10 @@ class LNGRULayer(MergeLayer):
             hidden_update = self.nonlinearity_hidden_update(hidden_update)
 
             if self.normalize_hidden_update:
-                hidden_update = self.__ln__(hidden_update,
-                                   T.dot(ones, self.alpha_hidden_update.dimshuffle('x', 0)),
-                                   self.beta_hidden_update)
+                hidden_update = self.__ln__(
+                    hidden_update,
+                    T.dot(ones, self.alpha_hidden_update.dimshuffle('x', 0)),
+                    self.beta_hidden_update)
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
             hid = (1 - updategate)*hid_previous + updategate*hidden_update
             return hid
@@ -512,7 +515,9 @@ class LNGRULayer(MergeLayer):
         # When we aren't precomputing the input outside of scan, we need to
         # provide the input weights and biases to the step function
         if not self.precompute_input:
-            non_seqs += [W_in_stacked, b_stacked, alpha_in_stacked, beta_in_stacked]
+            non_seqs += [
+                W_in_stacked, b_stacked, alpha_in_stacked, beta_in_stacked
+            ]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
@@ -539,7 +544,6 @@ class LNGRULayer(MergeLayer):
 
         return hid_out
 
-
     def get_output_for(self, inputs, **kwargs):
         # When it is requested that we only return the final sequence step,
         # we need to slice it out immediately after scan is applied
@@ -563,10 +567,10 @@ class Conv3DLayer(BaseConvLayer):
                  W=init.GlorotUniform(), b=init.Constant(0.),
                  nonlinearity=nonlinearities.rectify, flip_filters=True,
                  convolution=T.nnet.conv3d, **kwargs):
-        BaseConvLayer.__init__(self, incoming, num_filters, filter_size,
-                                          stride, pad, untie_biases, W, b,
-                                          nonlinearity, flip_filters, n=3,
-                                          **kwargs)
+        BaseConvLayer.__init__(
+            self, incoming, num_filters, filter_size,
+            stride, pad, untie_biases, W, b,
+            nonlinearity, flip_filters, n=3, **kwargs)
         self.convolution = convolution
 
     def convolve(self, input, **kwargs):
@@ -590,8 +594,10 @@ class TransposedConv3DLayer(BaseConvLayer):
                 output_size is not None):
             output_size = as_tuple(output_size, 3, int)
         self.output_size = output_size
-        BaseConvLayer.__init__(self, incoming, num_filters, filter_size, stride, crop, untie_biases,
-                W, b, nonlinearity, flip_filters, n=3, **kwargs)
+        BaseConvLayer.__init__(
+            self, incoming, num_filters, filter_size,
+            stride, crop, untie_biases,
+            W, b, nonlinearity, flip_filters, n=3, **kwargs)
         # rename self.pad to self.crop:
         self.crop = self.pad
         del self.pad
@@ -835,6 +841,7 @@ def unfold_bias_and_nonlinearity_layers(layer):
         incoming = layer
     return layer
 
+
 def build_siamese(layer):
     """"""
     smx = nonlinearities.softmax
@@ -845,10 +852,13 @@ def build_siamese(layer):
         hasattr(l, 'nonlinearity') and
         ((l.nonlinearity != smx) and (l.nonlinearity != lnr)),
         layers)[0].nonlinearity
-    print(nl)
 
-    Xl = T.tensor3('left')
-    Xr = T.tensor3('right')
+    if len(layers[0].output_shape) == 3:
+        Xl = T.tensor3('left')
+        Xr = T.tensor3('right')
+    elif len(layers[0].output_shape) == 4:
+        Xl = T.tensor4('left')
+        Xr = T.tensor4('right')
 
     Ol = L.get_output(layer, inputs=Xl)
     # Ol_vl = L.get_output(layer, inputs=Xl, deterministic=True)
