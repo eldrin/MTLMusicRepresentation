@@ -152,10 +152,10 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         self.k = k
 
         if self.task_type == 'recommendation':
-            # self.model = ContentExplicitALS(n_factors=n_factors, bias=bias,
-            #                                 max_iter=max_iter, verbose=False)
-            self.model = ExplicitALS(n_factors=n_factors, bias=bias,
-                                     max_iter=max_iter, verbose=False)
+            self.model = ContentExplicitALS(n_factors=n_factors, bias=bias,
+                                            max_iter=max_iter, verbose=False)
+            # self.model = ExplicitALS(n_factors=n_factors, bias=bias,
+            #                          max_iter=max_iter, verbose=False)
         else:
             raise ValueError(
                 '[ERROR] RecSysEvaluator only suports recommendation!')
@@ -262,7 +262,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
 
             # valid
             res.append(
-                self.score_at_k(self.model, self.k, valid, X_test=None))
+                self.score_at_k(self.model, self.k, valid, X_test=X))
 
         # 3. return result
         return res
@@ -279,8 +279,8 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         rnd_u = np.random.choice(n, n, replace=False)
         rnd_i = np.random.choice(m, m, replace=False)
         R = R[rnd_u][:, rnd_i]
-        X = None
-        # X = X[rnd_i]
+        # X = None
+        X = X[rnd_i]
         # X = np.random.rand(*X.shape)
 
         t = time.time()

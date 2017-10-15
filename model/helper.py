@@ -73,6 +73,8 @@ def get_train_funcs(net, config, input_vars=None, **kwargs):
     for target in config.target:
         # get access point
         out_layer_name = '{}.out'.format(target)
+        input_name = '{}.inputs'.format(target)
+        input_var = input_vars[input_name]
 
         layers = L.get_all_layers(net[out_layer_name])
 
@@ -107,17 +109,17 @@ def get_train_funcs(net, config, input_vars=None, **kwargs):
         if target == 'self':
             # cost_rel_inputs = [layers[0].input_var,
             #                    target_net['input'].input_var]
-            if input_vars is not None:
-                cost_rel_inputs = list(input_vars)
+            if input_var is not None:
+                cost_rel_inputs = list(input_var)
                 cost_rel_inputs.append(Y)
                 input_var_feat = [cost_rel_inputs[0]]
-                input_var_pred = input_vars
+                input_var_pred = input_var
             else:
                 raise ValueError(
                     '[ERROR] In "self" case, you need to pass input vars')
         else:
-            if input_vars is not None:
-                cost_rel_inputs = list(input_vars)
+            if input_var is not None:
+                cost_rel_inputs = list(input_var)
                 cost_rel_inputs.append(Y)
             else:
                 cost_rel_inputs = [layers[0].input_var, Y]

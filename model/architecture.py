@@ -279,6 +279,8 @@ class Conv2DSmallChimera(BaseArchitecture):
                     )
                     inputs = [self.net['input'].input_var]
 
+                self.variables['{}.inputs'.format(target)] = inputs
+
         # make a concatation layer just for save/load purpose
         self.net['IO'] = L.ConcatLayer(
             [L.FlattenLayer(self.net[target_layer_name])
@@ -286,7 +288,6 @@ class Conv2DSmallChimera(BaseArchitecture):
              for target_layer_name in out_layer_names],
             name='IO'
         )
-        self.variables['inputs'] = inputs
 
         if self.verbose:
             for target in targets:

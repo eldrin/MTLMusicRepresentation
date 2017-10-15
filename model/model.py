@@ -65,14 +65,16 @@ class Model:
         arch = Architecture(config)
         self.net, self.net_var = arch.build()
         self.corruption_var = self.net_var['sigma']
-        self.input_var = self.net_var['inputs']
+        input_vars = dict(
+            filter(lambda x: 'inputs' in x[0], self.net_var.items())
+        )
 
         # load trained model
         self.iter, self.net = load_check_point(self.net, config)
 
         # get train ops
         funcs = get_train_funcs(self.net, config, feature_layer=feature_layer,
-                                input_vars=self.input_var)
+                                input_vars=input_vars)
 
         # assign instance method
         self._partial_fit = {}
