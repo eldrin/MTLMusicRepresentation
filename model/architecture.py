@@ -180,7 +180,8 @@ class Conv2DSmallChimera(BaseArchitecture):
                     self.net, self.n_convs[i], self.n_filters[i],
                     self.filter_sizes[i], self.strides[i],
                     self.pool_sizes[i], self.non_lin,
-                    self.batch_norm, self.net.keys()[-1], name)
+                    self.batch_norm, name, self.net.keys()[-1],
+                    self.verbose)
             # GAP
             self.net['gap'] = L.batch_norm(L.GlobalPoolLayer(
                 self.net[next(reversed(self.net))], name='gap'))
