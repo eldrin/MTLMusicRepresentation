@@ -65,7 +65,10 @@ def get_train_funcs(net, config, input_vars=None, **kwargs):
     beta = config.hyper_parameters.l2
 
     # currently, we will only use 'fc' output as feature
-    feature_layer = '{}.fc'
+    if config.hyper_parameters.branch_at != 'fc':
+        feature_layer = '{}.fc'
+    else:
+        feature_layer = 'fc'
 
     # function containor
     functions = {}
