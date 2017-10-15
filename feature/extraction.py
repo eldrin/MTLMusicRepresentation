@@ -251,7 +251,7 @@ def main(task, model_state_fn, out_dir, hop_sz=1., feature_layer='{}.fc'):
                 feature_layer=feature_layer,
                 out_dir=out_dir
             )
-        ext.process()
+            ext.process()
     else:  # individual tasks
         ext = BaseExtractor(
             fn=model_state_fn,
