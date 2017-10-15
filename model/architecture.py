@@ -212,6 +212,7 @@ class Conv2DSmallChimera(BaseArchitecture):
                         name=out_layer_names[-1]
                     )
                     inputs = [self.net['input'].input_var]
+                self.variables['{}.inputs'.format(target)] = inputs
         else:
             # shares lower part of the network and branch out
 
