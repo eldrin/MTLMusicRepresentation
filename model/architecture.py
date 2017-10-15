@@ -146,7 +146,7 @@ class Conv2DSmallChimera(BaseArchitecture):
             if branch_at > len(self.n_convs):
                 raise ValueError(
                     '[ERROR] branch point need to be smaller than n_convs')
-        elif isinstance(branch_at, str):
+        elif isinstance(branch_at, (str, unicode)):
             if branch_at != 'fc':
                 raise ValueError(
                     '[ERROR] only support "fc" for string branch point now')
