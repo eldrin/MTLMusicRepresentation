@@ -69,7 +69,7 @@ def conv_block(
             prev = next(reversed(net))
 
         net[layer_name] = L.Conv2DLayer(
-            net[prev_name],
+            net[prev],
             num_filters=n_filters,
             filter_size=filter_size[n],
             stride=stride,
