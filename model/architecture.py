@@ -132,10 +132,10 @@ class Conv2DSmallChimera(BaseArchitecture):
         super(Conv2DSmallChimera, self).__init__(config, **kwargs)
 
         self.mel = input_mel
-        self.n_convs = [1, 1, 2, 2, 2, 3]
-        self.n_filters = [16, 32, 64, 128, 256, 256]
+        self.n_convs = [1, 1, 1, 1, 1, 2]
+        self.n_filters = [16, 32, 64, 64, 128, 256]
         self.filter_sizes = [(5, 5), (3, 3), (3, 3), (3, 3),
-                             (3, 3), [(3, 3), (3, 3), (1, 1)]]
+                             (3, 3), [(3, 3), (1, 1)]]
         self.strides = [(2, 1), None, None, None, None, None]
         self.pool_sizes = [(2, 2), (2, 2), (2, 2), (2, 2), (2, 2), None]
         self.batch_norm = True
