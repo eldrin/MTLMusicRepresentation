@@ -4,20 +4,19 @@ from abc import ABCMeta, abstractmethod
 
 import numpy as np
 from scipy import sparse as sp
-
 # from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_predict, KFold
+from sklearn.model_selection import cross_val_predict, StratifiedKFold, KFold
 from sklearn.metrics import (classification_report,
                              accuracy_score,
                              r2_score,
                              confusion_matrix)
 
 from model.recsys.model import ContentExplicitALS
-from model.recsys.model import ExplicitALS
+# from model.recsys.model import ExplicitALS
 import h5py
 from tqdm import tqdm
 
@@ -73,6 +72,8 @@ class BaseExternalTaskEvaluator(object):
                     [data['X'][t.decode()] for t in data.attrs['targets']],
                     axis=1
                 )
+                if data['X'].keys()[0] != 'fc'
+                else data['X']['fc'][:]
                 for data in self.data
             ], axis=1
         )
@@ -108,11 +109,13 @@ class MLEvaluator(BaseExternalTaskEvaluator):
     def evaluate(self):
         """"""
         X, y_true = self.prepare_data()
+        print(X.shape)
         if y_true.ndim == 2 and y_true.shape[-1] == 1:
             y_true = y_true.ravel()
 
         t = time.time()
-        y_pred = cross_val_predict(self.pipeline, X, y_true, cv=10)
+        cv = StratifiedKFold(10, shuffle=True)
+        y_pred = cross_val_predict(self.pipeline, X, y_true, cv=cv)
         cv_time = time.time() - t
 
         if self.task_type == 'classification':
@@ -142,8 +145,8 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=200, cv=5,
-                 eval_type='inner', bias=False, n_factors=40, max_iter=20):
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=40, cv=5,
+                 eval_type='outer', bias=False, n_factors=10, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 

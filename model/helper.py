@@ -88,7 +88,8 @@ def get_train_funcs(net, config, input_vars=None, **kwargs):
 
         if target == 'self':
             train_params.extend(
-                L.get_all_params(net['self.fc'], trainable=True))
+                L.get_all_params(net[feature_layer.format(target)],
+                                 trainable=True))
 
         if net[out_layer_name].nonlinearity == softmax:
             loss = lasagne.objectives.categorical_crossentropy

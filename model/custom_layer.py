@@ -740,13 +740,17 @@ def build_autoencoder(layer, nonlinearity='same', b=init.Constant(0.),
                 sigma=layer.sigma
             )
             autoencoder_layers.append(a_layer)
-        elif isinstance(layer, L.Conv2DLayer) and learnable_conv:
+        elif isinstance(layer, L.Conv2DLayer):
             a_layer = L.TransposedConv2DLayer(
                 incoming=incoming, num_filters=layer.input_shape[1],
                 filter_size=layer.filter_size, stride=layer.stride,
                 crop=layer.pad, untie_biases=layer.untie_biases, b=None,
                 nonlinearity=None)
-            # a_layer = NonlinearityLayer(incoming=a_layer, **kwargs_n)
+        elif isinstance(layer, L.MaxPool2DLayer):
+            a_layer = L.Upscale2DLayer(
+                incoming=incoming, scale_factor=layer.pool_size)
+        elif isinstance(layer, L.BatchNormLayer):
+            a_layer = L.BatchNormLayer(incoming)
         else:
             a_layer = InverseLayer(
                 incoming=incoming,

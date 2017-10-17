@@ -62,7 +62,7 @@ DATASET_INFO = {
 
 class BaseExtractor(object):
     """"""
-    def __init__(self, fn, task, feature_layer='{}.fc', out_dir=None,
+    def __init__(self, fn, task, out_dir=None,
                  cam_layer='conv5.1', hop_sz=1., *args, **kwargs):
         """"""
         if task not in DATASET_INFO:
@@ -114,10 +114,15 @@ class BaseExtractor(object):
             self.melspec = MelSpectrogramGPU(
                 2, self.sr, self.n_fft, self.hop_sz_trn)
 
-        self.feature_layers = [
-            feature_layer.format(t)
-            for t in self.targets
-        ]
+        # set feature layer names
+        branch_at = self.config.hyper_parameters.branch_at
+        if isinstance(branch_at, (int, float)):
+            self.feature_layers = [
+                '{}.fc'.format(t)
+                for t in self.targets
+            ]
+        elif isinstance(branch_at, (str, unicode)) and branch_at == "fc":
+            self.feature_layers = ['fc']
 
         # prepare database
         self.prepare_db()
@@ -155,13 +160,19 @@ class BaseExtractor(object):
         self.hf.create_dataset('y', shape=(n, l))
 
         self.hf.create_group('X')
+        # 'FC' branch case, only one dataset needed
+        if self.feature_layers[0] == 'fc':
+            self.hf['X'].create_dataset('fc', shape=(n, m * 2))
+        # otherwise, dataset needed per each task
+        else:
+            for target, n_out in zip(self.targets, o):
+                # mean / std
+                self.hf['X'].create_dataset(target, shape=(n, m * 2))
+
         self.hf.create_group('Z')
         for target, n_out in zip(self.targets, o):
-            self.hf['X'].create_dataset(target, shape=(n, m * 2))  # mean / std
-
             if target == 'self':
                 continue
-
             self.hf['Z'].create_dataset(target, shape=(n, n_out))
 
         if self.task_type == 'classification':
@@ -208,15 +219,25 @@ class BaseExtractor(object):
             if self.config.hyper_parameters.input == 'melspec':
                 x_chunk = self.melspec.process(x_chunk)
             X.append(x_chunk)
+        x = np.concatenate(X, axis=0)
 
-        for target in self.targets:
-            x = np.concatenate(X, axis=0)
-            Y = self.model.feature(target, x)
-            mean_prob[target].append(
-                self.model.predict(target, x).mean(axis=0).ravel())
-            feature[target] = np.concatenate(
+        # 'FC' branching case, all feature are same
+        if self.feature_layers[0] == 'fc':
+            Y = self.model.feature(self.targets[0], x)
+            feature['fc'] = np.concatenate(
                 [np.mean(Y, axis=0).ravel(),
                  np.std(Y, axis=0).ravel()]).ravel()
+        # other branching cases, need to extract each feature
+        else:
+            for target in self.targets:
+                Y = self.model.feature(target, x)
+                feature[target] = np.concatenate(
+                    [np.mean(Y, axis=0).ravel(),
+                     np.std(Y, axis=0).ravel()]).ravel()
+
+        for target in self.targets:
+            mean_prob[target].append(
+                self.model.predict(target, x).mean(axis=0).ravel())
 
         return feature, mean_prob
 
@@ -240,7 +261,7 @@ class BaseExtractor(object):
             self.hf['y'][ix] = self._extract_label(label)
 
 
-def main(task, model_state_fn, out_dir, hop_sz=1., feature_layer='{}.fc'):
+def main(task, model_state_fn, out_dir, hop_sz=1.):
     """"""
     if task.lower() == 'all':  # do it all
         for task_, info in DATASET_INFO.iteritems():
@@ -248,7 +269,6 @@ def main(task, model_state_fn, out_dir, hop_sz=1., feature_layer='{}.fc'):
                 fn=model_state_fn,
                 task=task_,
                 hop_sz=hop_sz,
-                feature_layer=feature_layer,
                 out_dir=out_dir
             )
             ext.process()
@@ -257,7 +277,6 @@ def main(task, model_state_fn, out_dir, hop_sz=1., feature_layer='{}.fc'):
             fn=model_state_fn,
             task=task,
             hop_sz=hop_sz,
-            feature_layer=feature_layer,
             out_dir=out_dir
             )
         ext.process()
