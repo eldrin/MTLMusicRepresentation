@@ -1,6 +1,6 @@
 #!/usr/bin/python
+
 import os
-import time
 import json
 from itertools import combinations
 
@@ -13,10 +13,12 @@ import h5py
 
 import fire
 
+
 class Evaluate(object):
     """"""
-    def __init__(self, out_dir=None, comb_lim=2, preproc=None, n_trial=1, n_jobs=-1,
-                 keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
+    def __init__(
+        self, out_dir=None, comb_lim=2, preproc=None, n_trial=1, n_jobs=-1,
+        keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
         """"""
         if out_dir is None:
             out_dir = os.getcwd()
@@ -57,13 +59,13 @@ class Evaluate(object):
                     else:
                         keep_res[task] = {}
                         avail_feats = filter(
-                            lambda x:x[1] is not None, paths.items())
+                            lambda x: x[1] is not None, paths.items())
 
                         for r in xrange(1, self.comb_lim+1):
                             for comb in combinations(avail_feats, r):
 
                                 # make each combination's file name id
-                                comb_key = '-'.join(map(lambda x:x[0], comb))
+                                comb_key = '-'.join(map(lambda x: x[0], comb))
                                 out_fn = comb_key + '-{}.txt'.format(task)
 
                                 # and file path list
@@ -89,9 +91,9 @@ class Evaluate(object):
                                     if metric in scores:
                                         keep_res[task][comb_key] = \
                                             {
-                                                metric:{
-                                                    'avg':scores[metric].mean(),
-                                                    'std':scores[metric].std()
+                                                metric: {
+                                                    'avg': scores[metric].mean(),
+                                                    'std': scores[metric].std()
                                                 }
                                             }
 
@@ -158,14 +160,14 @@ class Evaluate(object):
         """"""
 
         lines = ''
-        if res['classification_report'] is not None:
-            lines += '=================  Classification Report =================='
-            lines += '\n'
-            lines += res['classification_report']
-            lines += '\n'
-            lines += '====================  Confusion Matrix ===================='
-            lines += print_cm(*res['confusion_matrix'])
-            lines += '\n'
+        # if res['classification_report'] is not None:
+        #     lines += '=================  Classification Report =================='
+        #     lines += '\n'
+        #     lines += res['classification_report']
+        #     lines += '\n'
+        #     lines += '====================  Confusion Matrix ===================='
+        #     lines += print_cm(*res['confusion_matrix'])
+        #     lines += '\n'
 
         score_key = filter(lambda k: 'score' in k, res.keys())
 
@@ -193,11 +195,12 @@ class Evaluate(object):
         elif task == 'regression':
             if self.preproc is None:
                 print(
-                    '[WARNING] found no preprocessor. set z-scaler for default...'
+                    '[WARNING] found no preprocessor. \
+                    set z-scaler for default...'
                 )
                 self.preproc = 'standardize'
-	    evaluator = MLEvaluator(
-	        fns, self.preproc, self.n_jobs)
+            evaluator = MLEvaluator(
+                fns, self.preproc, self.n_jobs)
 
         elif task == 'classification':
             evaluator = MLEvaluator(
@@ -206,6 +209,7 @@ class Evaluate(object):
             raise ValueError('[ERROR] {} is not supported task!'.format(task))
 
         return evaluator
+
 
 if __name__ == "__main__":
     fire.Fire(Evaluate)
