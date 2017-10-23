@@ -120,7 +120,7 @@ class Evaluate(object):
                             'summary.{}.csv'.format(metric)))
 
             # single feature file case ====================================
-            elif os.path.splitext(path)[-1] == '.h5': 
+            elif os.path.splitext(path)[-1] == '.h5':
 
                 # prepare path
                 path = path.split('-')

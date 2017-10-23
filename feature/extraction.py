@@ -17,7 +17,7 @@ import h5py
 
 from model.preproc.model import MelSpectrogramGPU
 from model.model import Model
-from utils.misc import get_layer
+from utils.misc import get_layer, load_config
 
 import fire
 import tqdm
@@ -158,14 +158,21 @@ class MTLExtractor(BaseExtractor):
         """"""
         super(MTLExtractor, self).__init__(task, out_dir, hop_sz, prob=True)
 
-        model_id = os.path.splitext(os.path.basename(model_fn))[0]
-        self.model_id = model_id.split('_state')[0]
+        # load configuration for model
+        if os.path.exists(model_fn):
+            model_id = os.path.splitext(os.path.basename(model_fn))[0]
+            self.model_id = model_id.split('_state')[0]
+            model_state = joblib.load(model_fn)
+            self.config = namedtupled.map(model_state['config'])
+        else:
+            self.model_id = 'rnd'
+            # load default config and change task as rand
+            self.config = load_config('../config/config.example.json')
+            self.config.targets = ['rand']
+
         self.out_fn = os.path.join(
             self.root, self.model_id + '_{}_feature.h5'.format(self.task))
 
-        # load configuration for model
-        model_state = joblib.load(model_fn)
-        self.config = namedtupled.map(model_state['config'])
         self.targets = self.config.target
 
         # load model

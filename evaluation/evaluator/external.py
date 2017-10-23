@@ -9,7 +9,10 @@ from sklearn.svm import SVC, SVR
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import cross_val_predict, StratifiedKFold, KFold
+from sklearn.model_selection import (cross_val_predict,
+                                     StratifiedKFold,
+                                     KFold,
+                                     GridSearchCV)
 from sklearn.metrics import (classification_report,
                              accuracy_score,
                              r2_score,
@@ -35,6 +38,7 @@ class BaseExternalTaskEvaluator(object):
             raise ValueError('[ERROR] All dataset should be same!')
 
         self.task_type = self.data[0].attrs['type']
+        self.n_jobs = n_jobs
 
         # initiate pre-processor
         if preproc is not None:
@@ -93,9 +97,20 @@ class MLEvaluator(BaseExternalTaskEvaluator):
         """"""
         super(MLEvaluator, self).__init__(fns, preproc, n_jobs)
 
+        self.n_cv = 4
+        self.tune_params = [
+            {'kernel': ['rbf'], 'C': [0.001, 0.1, 1, 10, 100],
+             'gamma': [1e-3, 1e-4]},
+            {'kernel': ['linear'], 'C': [0.001, 0.1, 1, 10, 100]}]
         if self.task_type == 'classification':
+            # self.model = SVC
+            # self.model = GridSearchCV(SVC(), self.tune_params, cv=self.n_cv,
+            #                           n_jobs=n_jobs)
             self.model = SVC(kernel='linear')
         elif self.task_type == 'regression':
+            # self.model = SVR
+            # self.model = GridSearchCV(SVR(), self.tune_params, cv=self.n_cv,
+            #                           n_jobs=n_jobs)
             self.model = SVR()
         else:
             raise ValueError(
@@ -116,6 +131,24 @@ class MLEvaluator(BaseExternalTaskEvaluator):
         t = time.time()
         cv = StratifiedKFold(10, shuffle=True)
         y_pred = cross_val_predict(self.pipeline, X, y_true, cv=cv)
+        # y_t, y_p = [], []
+        # for train_idx, test_idx in cv.split(X, y_true):
+        #     # get split
+        #     X_train, X_test = X[train_idx], X[test_idx]
+        #     y_train, y_test = y_true[train_idx], y_true[test_idx]
+        #     # re-init model
+        #     mdl = GridSearchCV(self.model(), self.tune_params, cv=self.n_cv,
+        #                        n_jobs=1, verbose=1)
+        #     self.pipeline = Pipeline(
+        #         steps=[('sclr', self.preproc), ('model', mdl)])
+        #     # fit with hyper-param search
+        #     self.pipeline.fit(X_train, y_train)
+        #     print(self.pipeline.named_steps['model'].best_params_)
+        #     # save results
+        #     y_t.append(y_test)
+        #     y_p.append(self.pipeline.predict(X_test))
+        # y_true = np.concatenate(y_t, axis=0)
+        # y_pred = np.concatenate(y_p, axis=0)
         cv_time = time.time() - t
 
         if self.task_type == 'classification':
