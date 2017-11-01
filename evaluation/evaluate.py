@@ -17,13 +17,14 @@ import fire
 class Evaluate(object):
     """"""
     def __init__(
-        self, out_dir=None, comb_lim=2, preproc=None, n_trial=1, n_jobs=-1,
-        keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
+            self, out_dir=None, out_fn=None, comb_lim=2, preproc=None, n_trial=1, n_jobs=-1,
+            keep_metrics=['accuracy_score', 'recall@40_score', 'r2_score']):
         """"""
         if out_dir is None:
             out_dir = os.getcwd()
 
         self.out_dir = out_dir
+        self.out_fn = out_fn
         self.preproc = preproc
         self.comb_lim = comb_lim
         self.n_jobs = n_jobs
@@ -42,9 +43,46 @@ class Evaluate(object):
 
         # feature file directory case ====================================
         if os.path.isdir(path):
-            # evaluation all files in dir
-            raise NotImplementedError(
-                '[ERROR] directory input is not yet supported!')
+            keep_scores = {
+                'classification': 'accuracy_score',
+                'regression': 'r2_score',
+                'recommendation': 'ndcg'
+            }
+            # get file names
+            fns = {}
+            for root, dirs, files in os.walk(path):
+                fns = dict(map(
+                    lambda f:
+                    (self._get_ext_task_name(f), os.path.join(root, f)),
+                    files
+                ))
+
+            # evaluate all feature h5py in the dir
+            res = {}
+            for task, fn in fns.iteritems():
+                res[task] = []
+                with h5py.File(fn) as hf:
+                    task_type = hf.attrs['type']
+
+                for i in range(self.n_trial):
+                    evaluator = self._get_evaluator(task_type, [fn])
+                    r = filter(
+                        lambda x: keep_scores[task_type] in x[0],
+                        evaluator.evaluate().items()
+                    )[0][1]
+                    if task_type == 'classification':
+                        res[task].append(r * 100)
+                    else:
+                        res[task].append(r)
+
+            # save result as txt file
+            if self.out_fn is None:
+                out_fn = 'result.txt'
+            else:
+                out_fn = self.out_fn
+
+            out_fn = os.path.join(self.out_dir, out_fn)
+            pd.DataFrame(res).to_csv(out_fn)
 
         # evlauation config file case ====================================
         else:
@@ -121,29 +159,21 @@ class Evaluate(object):
 
             # single feature file case ====================================
             elif os.path.splitext(path)[-1] == '.h5':
-
                 # prepare path
                 path = path.split('-')
                 out_fn = '-'.join(
                     [os.path.splitext(os.path.basename(fn))[0] for fn in path])
                 out_fn += '{}.txt'
 
-                # instantiate evaluator & evaluate
-                # TODO: fix this temporary workaround
+                # TODO: currently ad-hoc. need to fix it later
                 with h5py.File(path[0]) as hf:
-                    if hf.attrs['type'] == 'recommendation':
-                        task = 'recsys'
-                    else:
-                        task = hf.attrs['type']
-
-                # TODO: currently add-hoc. need to fix it after
+                    task = hf.attrs['type']
                 for i in range(self.n_trial):
                     evaluator = self._get_evaluator(task, path)
                     res = evaluator.evaluate()
 
                     # save & print
                     self._save(out_fn, self._print(res))
-
             else:
                 raise ValueError(
                     '[ERROR] only confing (json) and feature (h5) files are\
@@ -160,14 +190,14 @@ class Evaluate(object):
         """"""
 
         lines = ''
-        # if res['classification_report'] is not None:
-        #     lines += '=================  Classification Report =================='
-        #     lines += '\n'
-        #     lines += res['classification_report']
-        #     lines += '\n'
-        #     lines += '====================  Confusion Matrix ===================='
-        #     lines += print_cm(*res['confusion_matrix'])
-        #     lines += '\n'
+        if res['classification_report'] is not None:
+            lines += '=================  Classification Report =================='
+            lines += '\n'
+            lines += res['classification_report']
+            lines += '\n'
+            lines += '====================  Confusion Matrix ===================='
+            lines += print_cm(*res['confusion_matrix'])
+            lines += '\n'
 
         score_key = filter(lambda k: 'score' in k, res.keys())
 
@@ -188,7 +218,7 @@ class Evaluate(object):
 
     def _get_evaluator(self, task, fns):
         """"""
-        if task == 'recsys':
+        if task == 'recommendation':
             evaluator = RecSysEvaluator(
                 fns, self.preproc, self.n_jobs)
 
@@ -198,17 +228,28 @@ class Evaluate(object):
                     '[WARNING] found no preprocessor. \
                     set z-scaler for default...'
                 )
+                _preproc = self.preproc
                 self.preproc = 'standardize'
             evaluator = MLEvaluator(
                 fns, self.preproc, self.n_jobs)
+            self.preproc = _preproc
 
         elif task == 'classification':
             evaluator = MLEvaluator(
-                    fns, self.preproc, self.n_jobs)
+                fns, self.preproc, self.n_jobs)
         else:
             raise ValueError('[ERROR] {} is not supported task!'.format(task))
 
         return evaluator
+
+    def _get_ext_task_name(self, fn):
+        """"""
+        ext_tasks = ['GTZAN', 'Ballroom', 'EmoAroStatic', 'EmoValStatic',
+                     'FMA_SUB', 'IRMAS_SUB', 'ThisIsMyJam']
+        for task in ext_tasks:
+            if task in fn:
+                return task
+        return None
 
 
 if __name__ == "__main__":
