@@ -17,6 +17,7 @@ from sklearn.metrics import (classification_report,
                              accuracy_score,
                              r2_score,
                              confusion_matrix)
+from ml_metrics.average_precision import apk
 
 from model.recsys.model import ContentExplicitALS
 # from model.recsys.model import ExplicitALS
@@ -178,7 +179,7 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=40, cv=5,
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=10, cv=10,
                  eval_type='outer', bias=False, n_factors=10, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
@@ -201,6 +202,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         """"""
         recall = []
         precision = []
+        ap = []
         ndcg = []
 
         # prediction
@@ -224,6 +226,8 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             recall.append(np.sum(rel[:k]) / np.sum(r))
             precision.append(np.sum(rel[:k]) / k)
             ndcg.append(ndcg_at_k(rel, k, method=0))
+            ap.append(apk(np.where(r)[0].tolist(),
+                          np.argsort(r_)[::-1], k=k))
 
             # pred_at_k = np.argsort(r_)[-k:]
             # pred_rank_at_k = [
@@ -234,7 +238,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             # precision.append(float(len(hit_at_k)) / k)
 
         # mean recall@k over users
-        return np.mean(precision), np.mean(recall), np.mean(ndcg)
+        return np.mean(precision), np.mean(recall), np.mean(ndcg), np.mean(ap)
 
     @staticmethod
     def _make_cv(R, n_cv=5, typ='outer'):
@@ -246,7 +250,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         if typ == 'outer':
             triplet = _db2triplet(R)
             for trn_id, val_id in kf.split(range(R.shape[1])):
-                split_cv.append(None)
+                split_cv.append((trn_id, val_id))
                 trn_track_set = set(trn_id)
                 val_track_set = set(val_id)
                 train = np.array(filter(lambda x: x[1] in trn_track_set,
@@ -326,12 +330,14 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         precision = np.mean(map(lambda x: x[0], scores))
         recall = np.mean(map(lambda x: x[1], scores))
         ndcg = np.mean(map(lambda x: x[2], scores))
+        ap = np.mean(map(lambda x: x[3], scores))
 
         return {'classification_report': None,
                 'confusion_matrix': None,
                 'recall@{:d}_score'.format(self.k): recall,
                 'precision@{:d}_score'.format(self.k): precision,
                 'ndcg@{:d}_score'.format(self.k): ndcg,
+                'ap@{:d}_score'.format(self.k): ap,
                 'time': cv_time}
 
 

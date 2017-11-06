@@ -167,8 +167,8 @@ class MTLExtractor(BaseExtractor):
         else:
             self.model_id = 'rnd'
             # load default config and change task as rand
-            self.config = load_config('../config/config.example.json')
-            self.config.targets = ['rand']
+            self.config = load_config('config/config.example.json')
+            self.config.target[0] = 'rand'
 
         self.out_fn = os.path.join(
             self.root, self.model_id + '_{}_feature.h5'.format(self.task))

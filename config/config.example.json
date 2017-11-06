@@ -12,7 +12,9 @@
         "sample_rate":22050,
 
         "architecture":"Conv2DSmallChimera",
-        "n_out":20,
+
+        "branch_at":4,
+        "n_out":50,
         "out_act":"softmax",
 
         "optimizer":"adam",
@@ -71,7 +73,7 @@
     "data_server":{
         "host":"localhost",
         "output_norm":false,
-        "hwm":10,
+        "hwm":8,
         "n_jobs":8
     },
 

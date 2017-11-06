@@ -46,7 +46,7 @@ class Evaluate(object):
             keep_scores = {
                 'classification': 'accuracy_score',
                 'regression': 'r2_score',
-                'recommendation': 'ndcg'
+                'recommendation': 'ap'
             }
             # get file names
             fns = {}
