@@ -179,7 +179,7 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=10, cv=10,
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=20, cv=10,
                  eval_type='outer', bias=False, n_factors=10, max_iter=20):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
