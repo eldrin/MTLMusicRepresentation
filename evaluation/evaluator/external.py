@@ -303,9 +303,13 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             self.model.fit(R=train, X=X)
 
             # valid
+            if self.eval_type == 'outer':
+                X_ = X[split[1]]
+            else:
+                X_ = X
+
             res.append(
-                self.score_at_k(self.model, self.k, valid, split,
-                                X_test=X[split[1]]))
+                self.score_at_k(self.model, self.k, valid, split, X_test=X_))
 
         # 3. return result
         return res
