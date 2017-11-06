@@ -198,18 +198,20 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
                 '[ERROR] RecSysEvaluator only suports recommendation!')
 
     @staticmethod
-    def score_at_k(model, k, R_test, X_test=None, verbose=False):
+    def score_at_k(model, k, R_test, split, X_test=None, verbose=False):
         """"""
         recall = []
         precision = []
         ap = []
         ndcg = []
+        valid_idx = split[1]
 
         # prediction
         if X_test is None:
             R_pred = model.predict()
         else:
-            R_pred = model.predict_from_side(X_test)
+            R_pred = model.predict()
+            R_pred[:, valid_idx] = model.predict_from_side(X_test)
 
         if verbose:
             iterator = tqdm(zip(R_test, R_pred))
@@ -302,7 +304,8 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
 
             # valid
             res.append(
-                self.score_at_k(self.model, self.k, valid, X_test=X))
+                self.score_at_k(self.model, self.k, valid, split,
+                                X_test=X[split[1]]))
 
         # 3. return result
         return res
