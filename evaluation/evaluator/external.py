@@ -204,12 +204,12 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
         precision = []
         ap = []
         ndcg = []
-        valid_idx = split[1]
 
         # prediction
         if X_test is None:
             R_pred = model.predict()
         else:
+            valid_idx = split[1]
             R_pred = model.predict()
             R_pred[:, valid_idx] = model.predict_from_side(X_test)
 
@@ -306,7 +306,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             if self.eval_type == 'outer':
                 X_ = X[split[1]]
             else:
-                X_ = X
+                X_ = None
 
             res.append(
                 self.score_at_k(self.model, self.k, valid, split, X_test=X_))
