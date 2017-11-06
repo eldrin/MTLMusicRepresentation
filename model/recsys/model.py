@@ -285,7 +285,7 @@ class ImplicitALS(BaseALS):
 class ContentExplicitALS(ExplicitALS):
     """"""
     def __init__(self, n_factors, learning_rate=0.01, max_iter=10,
-                 lam_u=1., lam_v=100, lam_w=1., init=0.01,
+                 lam_u=1., lam_v=1000, lam_w=1., init=0.01,
                  bias=False, verbose=False, *args, **kwargs):
         """"""
         super(ContentExplicitALS, self).__init__(n_factors, learning_rate,
