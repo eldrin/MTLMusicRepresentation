@@ -1,8 +1,8 @@
 from itertools import chain
-from sklearn.base import TansformerMixin
+from sklearn.base import TransformerMixin
 
 
-class FeatureBlockSelector(TansformerMixin):
+class FeatureBlockSelector(TransformerMixin):
 
     def __init__(self, blocks):
         self.blocks = blocks
