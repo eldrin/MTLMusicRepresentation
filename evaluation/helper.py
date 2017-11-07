@@ -6,8 +6,8 @@ class FeatureBlockSelector(BaseEstimator, TransformerMixin):
 
     def __init__(self, blocks):
         self.blocks = blocks
-        self.keep_dims = chain.from_iterable(
-            [range(i*32, (i+1)*32) for i in blocks])
+        self.keep_dims = list(chain.from_iterable(
+            [range(i*32, (i+1)*32) for i in blocks]))
 
     def transform(self, X):
         """"""
