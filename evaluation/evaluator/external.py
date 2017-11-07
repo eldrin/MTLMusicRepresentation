@@ -98,7 +98,7 @@ class MLEvaluator(BaseExternalTaskEvaluator):
         """"""
         super(MLEvaluator, self).__init__(fns, preproc, n_jobs)
 
-        self.n_cv = 4
+        self.n_cv = 10
         self.tune_params = [
             {'kernel': ['rbf'], 'C': [0.001, 0.1, 1, 10, 100],
              'gamma': [1e-3, 1e-4]},
@@ -139,7 +139,7 @@ class MLEvaluator(BaseExternalTaskEvaluator):
         #     y_train, y_test = y_true[train_idx], y_true[test_idx]
         #     # re-init model
         #     mdl = GridSearchCV(self.model(), self.tune_params, cv=self.n_cv,
-        #                        n_jobs=1, verbose=1)
+        #                        n_jobs=-1, verbose=1)
         #     self.pipeline = Pipeline(
         #         steps=[('sclr', self.preproc), ('model', mdl)])
         #     # fit with hyper-param search

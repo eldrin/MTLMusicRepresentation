@@ -230,9 +230,12 @@ class Evaluate(object):
                 )
                 _preproc = self.preproc
                 self.preproc = 'standardize'
-            evaluator = MLEvaluator(
-                fns, self.preproc, self.n_jobs)
-            self.preproc = _preproc
+                evaluator = MLEvaluator(
+                    fns, self.preproc, self.n_jobs)
+                self.preproc = _preproc
+            else:
+                evaluator = MLEvaluator(
+                    fns, self.preproc, self.n_jobs)
 
         elif task == 'classification':
             evaluator = MLEvaluator(
