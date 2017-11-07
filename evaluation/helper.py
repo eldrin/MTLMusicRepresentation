@@ -1,11 +1,33 @@
-"""by zachguo's github"""
-def print_cm(cm, labels, hide_zeroes=False, hide_diagonal=False, hide_threshold=None):
+from itertools import chain
+
+
+class FeatureBlockSelector:
+
+    def __init__(self, blocks):
+        self.blocks = blocks
+        self.keep_dims = chain.from_iterable(
+            [range(i*32, (i+1)*32) for i in blocks])
+
+    def transform(self, X):
+        """"""
+        if X.shape[-1] != 160:
+            raise ValueError('[ERROR] only supports 160 dimension!')
+        return X[:, self.keep_dims]
+
+    def fit(self, X, y=None):
+        """"""
+        return self
+
+
+def print_cm(cm, labels, hide_zeroes=False,
+             hide_diagonal=False, hide_threshold=None):
+    """by zachguo's github"""
     """pretty print for confusion matrixes"""
-    columnwidth = max([len(x) for x in labels]+[5]) # 5 is value length
+    columnwidth = max([len(x) for x in labels]+[5])  # 5 is value length
     empty_cell = " " * columnwidth
     # Print header
     line = '\n'
-    line +=  "    " + empty_cell
+    line += "    " + empty_cell
     for label in labels:
         line += "%{0}s".format(columnwidth) % label
     line += '\n'
