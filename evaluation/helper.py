@@ -6,14 +6,14 @@ class FeatureBlockSelector(BaseEstimator, TransformerMixin):
 
     def __init__(self, blocks):
         self.blocks = blocks
-        self.keep_dims = list(chain.from_iterable(
-            [range(i*32, (i+1)*32) for i in blocks]))
 
     def transform(self, X):
         """"""
         if X.shape[-1] != 160:
             raise ValueError('[ERROR] only supports 160 dimension!')
-        return X[:, self.keep_dims]
+        keep_dims = list(chain.from_iterable(
+            [range(i*32, (i+1)*32) for i in self.blocks]))
+        return X[:, keep_dims]
 
     def fit(self, X, y=None):
         """"""
