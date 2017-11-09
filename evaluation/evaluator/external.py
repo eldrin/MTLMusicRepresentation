@@ -179,8 +179,8 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=20, cv=10,
-                 eval_type='outer', bias=False, n_factors=10, max_iter=20):
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=20, cv=5,
+                 eval_type='outer', bias=False, n_factors=10, max_iter=70):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 
@@ -198,7 +198,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
                 '[ERROR] RecSysEvaluator only suports recommendation!')
 
     @staticmethod
-    def score_at_k(model, k, R_test, split, X_test=None, verbose=False):
+    def score_at_k(model, k, R_train, R_test, split, X_test=None, verbose=False):
         """"""
         recall = []
         precision = []
@@ -214,22 +214,25 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             R_pred[:, valid_idx] = model.predict_from_side(X_test)
 
         if verbose:
-            iterator = tqdm(zip(R_test, R_pred))
+            iterator = tqdm(zip(R_train, R_test, R_pred))
         else:
-            iterator = zip(R_test, R_pred)
+            iterator = zip(R_train, R_test, R_pred)
 
-        for r, r_ in iterator:
+        for rt, rv, r_ in iterator:
             # true = np.where(r > 0)[0].astype(float).ravel()
-            if np.sum(r) == 0:
+            if np.sum(rv) == 0:
                 continue
 
             # relavance sort by pred rank
-            rel = r[np.argsort(r_)][::-1]
-            recall.append(np.sum(rel[:k]) / np.sum(r))
+            rel = rv[np.argsort(r_)][::-1]
+            recall.append(np.sum(rel[:k]) / np.sum(rv))
             precision.append(np.sum(rel[:k]) / k)
             ndcg.append(ndcg_at_k(rel, k, method=0))
-            ap.append(apk(np.where(r)[0].tolist(),
-                          np.argsort(r_)[::-1], k=k))
+
+	    known = set(np.where(rt)[0].tolist()) 
+            test = np.where(rv)[0].tolist()
+            rl = filter(lambda y: y not in known, np.argsort(r_)[::-1].tolist())
+            ap.append(apk(test, rl, k=k))
 
             # pred_at_k = np.argsort(r_)[-k:]
             # pred_rank_at_k = [
@@ -309,7 +312,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
                 X_ = None
 
             res.append(
-                self.score_at_k(self.model, self.k, valid, split, X_test=X_))
+                self.score_at_k(self.model, self.k, train, valid, split, X_test=X_))
 
         # 3. return result
         return res
