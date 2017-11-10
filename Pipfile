@@ -111,3 +111,4 @@ widgetsnbextension = "==2.0.0"
 "3c556b6" = {file = "https://github.com/Lasagne/Lasagne/archive/master.zip"}
 gpustat = "*"
 "scikits.samplerate" = "*"
+seaborn = "*"

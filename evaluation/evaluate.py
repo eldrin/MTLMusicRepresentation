@@ -173,7 +173,8 @@ class Evaluate(object):
                     res = evaluator.evaluate()
 
                     # save & print
-                    self._save(out_fn, self._print(res))
+                    out_str = self._print(res)
+                    # self._save(out_fn, out_str)
             else:
                 raise ValueError(
                     '[ERROR] only confing (json) and feature (h5) files are\
