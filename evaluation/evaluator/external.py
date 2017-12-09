@@ -25,6 +25,10 @@ import h5py
 from tqdm import tqdm
 
 
+def identity_transform(x):
+    return x
+
+
 class BaseExternalTaskEvaluator(object):
     __metaclass__ = ABCMeta
 
@@ -52,7 +56,7 @@ class BaseExternalTaskEvaluator(object):
                     '[ERROR] only supports "standardize" \
                     and "pca_whiten" at the moment!')
         else:
-            self.preproc = FunctionTransformer(lambda x: x)
+            self.preproc = FunctionTransformer(identity_transform)
 
         self.model = None
 
@@ -100,14 +104,15 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
         self.n_cv = 10
         self.tune_params = [
-            {'kernel': ['rbf'], 'C': [0.001, 0.1, 1, 10, 100],
-             'gamma': [1e-3, 1e-4]},
-            {'kernel': ['linear'], 'C': [0.001, 0.1, 1, 10, 100]}]
+            {'model__kernel': ['rbf'], 'model__C': [0.001, 0.1, 1, 10, 100],
+             'model__gamma': [1e-3, 1e-4]},
+            {'model__kernel': ['linear'], 'model__C': [0.001, 0.1, 1, 10, 100]}]
         if self.task_type == 'classification':
             # self.model = SVC
             # self.model = GridSearchCV(SVC(), self.tune_params, cv=self.n_cv,
             #                           n_jobs=n_jobs)
             self.model = SVC(kernel='linear')
+            # self.model = SVC()
         elif self.task_type == 'regression':
             # self.model = SVR
             # self.model = GridSearchCV(SVR(), self.tune_params, cv=self.n_cv,
@@ -132,24 +137,12 @@ class MLEvaluator(BaseExternalTaskEvaluator):
         t = time.time()
         cv = StratifiedKFold(10, shuffle=True)
         y_pred = cross_val_predict(self.pipeline, X, y_true, cv=cv)
-        # y_t, y_p = [], []
-        # for train_idx, test_idx in cv.split(X, y_true):
-        #     # get split
-        #     X_train, X_test = X[train_idx], X[test_idx]
-        #     y_train, y_test = y_true[train_idx], y_true[test_idx]
-        #     # re-init model
-        #     mdl = GridSearchCV(self.model(), self.tune_params, cv=self.n_cv,
-        #                        n_jobs=-1, verbose=1)
-        #     self.pipeline = Pipeline(
-        #         steps=[('sclr', self.preproc), ('model', mdl)])
-        #     # fit with hyper-param search
-        #     self.pipeline.fit(X_train, y_train)
-        #     print(self.pipeline.named_steps['model'].best_params_)
-        #     # save results
-        #     y_t.append(y_test)
-        #     y_p.append(self.pipeline.predict(X_test))
-        # y_true = np.concatenate(y_t, axis=0)
-        # y_pred = np.concatenate(y_p, axis=0)
+        # model = GridSearchCV(self.pipeline,
+        #                      self.tune_params, cv=cv, n_jobs=-1)
+        # model.fit(X, y_true)
+        # print(model.best_params_)
+        # y_pred = cross_val_predict(model.best_estimator_, X, y_true)
+
         cv_time = time.time() - t
 
         if self.task_type == 'classification':
@@ -179,8 +172,8 @@ class MLEvaluator(BaseExternalTaskEvaluator):
 
 class RecSysEvaluator(BaseExternalTaskEvaluator):
     """"""
-    def __init__(self, fns, preproc=None, n_jobs=-1, k=20, cv=5,
-                 eval_type='outer', bias=False, n_factors=10, max_iter=70):
+    def __init__(self, fns, preproc=None, n_jobs=-1, k=20, cv=10,
+                 eval_type='outer', bias=False, n_factors=10, max_iter=40):
         """"""
         super(RecSysEvaluator, self).__init__(fns, preproc, n_jobs)
 
@@ -229,7 +222,7 @@ class RecSysEvaluator(BaseExternalTaskEvaluator):
             precision.append(np.sum(rel[:k]) / k)
             ndcg.append(ndcg_at_k(rel, k, method=0))
 
-	    known = set(np.where(rt)[0].tolist()) 
+            known = set(np.where(rt)[0].tolist())
             test = np.where(rv)[0].tolist()
             rl = filter(lambda y: y not in known, np.argsort(r_)[::-1].tolist())
             ap.append(apk(test, rl, k=k))

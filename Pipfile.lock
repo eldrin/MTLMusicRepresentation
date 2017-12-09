@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "7ea4baa867791bfbe925443a1a9708945776fa1b0c0cdaf29a073c6c4cc2e9a1"
+            "sha256": "b28a74c4c0bf3843e868d9f8949ffde30e30ff015ca8ca55624c2ff5f95a1b19"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -584,6 +584,13 @@
             ],
             "version": "==2.2.1"
         },
+        "patsy": {
+            "hashes": [
+                "sha256:63102f77df5c6b0c3fe3bf9d57bcea112d1e06d00a41823662b5044ce681f22c",
+                "sha256:dc1cc280045b0e6e50c04706fd1e26d2a00ea400aa112f88e8142f88b0b7d3d4"
+            ],
+            "version": "==0.4.1"
+        },
         "pbr": {
             "hashes": [
                 "sha256:60c25b7dfd054ef9bb0ae327af949dd4676aa09ac3a9471cdc871d8a9213f9ac",
@@ -1025,6 +1032,21 @@
                 "sha256:804d64df3cca224e969f21c56a44f21326fcf0965a2ff0b78ec319453c13880c"
             ],
             "version": "==1.3.0"
+        },
+        "statsmodels": {
+            "hashes": [
+                "sha256:5f94bf04a4ffe5e60f0648635506de0bd9d2041d8c30f72ddb272e214c2b8b24",
+                "sha256:6834eb063c5ff4803bbe61388a95c7c984cbcb8d11d1db0b85f50c772d4af9fb",
+                "sha256:e363b368bdcbd528270408dec3ac0558240774c2c0a71feb9cf2f774d4967fee",
+                "sha256:0a2db2f5b7d3983f349b4b8f50a734d2d80ee194587f8c7a2d4fbec89fc94218",
+                "sha256:01b6aee5ca88a6e5fb56184c5ea19c96ea3ad805bd564beba093fffb19f9766f",
+                "sha256:b9426bcc7f47b7d77ff5df66ca69d1ec7d9b7aaaf89662a5e6abceb6336adecd",
+                "sha256:51cb8689d0290d91f60ff3a1db34bd64a63f8d68d8b386012ee38e597ecc0a31",
+                "sha256:8d39f25cd7d8d4360f1e1726029a4917285f1dafb476c47bb36c3c1ee8c8f392",
+                "sha256:2fee3cc853fede203b2a632ef89f89f13f860b98939f024f31e3183ee50baf10",
+                "sha256:26431ab706fbae896db7870a0892743bfbb9f5c83231644692166a31d2d86048"
+            ],
+            "version": "==0.8.0"
         },
         "subprocess32": {
             "hashes": [

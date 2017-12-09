@@ -21,8 +21,8 @@ metric_map = {
     'Ballroom': 'Accuracy',
     'IRMAS_SUB': 'Accuracy',
     'FMA_SUB': 'Accuracy',
-    'EmoVal': 'R2',
-    'EmoAro': 'R2',
+    'EmoValStatic': 'R2',
+    'EmoAroStatic': 'R2',
     'ThisIsMyJam': 'Ap@20'
 }
 
@@ -89,5 +89,5 @@ def main(plan_fn, dset, runs=None):
 
 
 if __name__ == "__main__":
-    # fire.Fire(get_res)
-    fire.Fire(main)
+    fire.Fire(get_res)
+    # fire.Fire(main)
