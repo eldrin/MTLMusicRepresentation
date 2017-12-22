@@ -83,6 +83,11 @@ def get_layer(net, layer_name):
 
 def get_in_shape(config):
     """"""
+    if hasattr(config.hyper_parameters, 'n_ch'):
+        n_ch = config.hyper_parameters.n_ch
+    else:
+        n_ch = 2  # backward compatibility (will be removed)
+
     # win_sz = config.hyper_parameters.n_fft
     hop_sz = config.hyper_parameters.hop_size
     sr = config.hyper_parameters.sample_rate
@@ -91,11 +96,11 @@ def get_in_shape(config):
     sig_len = int(sr*length) - remaining
 
     if config.hyper_parameters.input == 'signal':
-        return (None, 2, sig_len)
+        return (None, n_ch, sig_len)
 
     elif config.hyper_parameters.input == 'melspec':
         dur = int(sig_len / hop_sz) + 1
-        return (None, 2, dur, 128)
+        return (None, n_ch, dur, 128)
 
 
 def get_loggers(config):
